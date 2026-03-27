@@ -1,0 +1,128 @@
+### ==========================================
+### LUỒNG TEST ỨNG VIÊN NỘP CV (FILE WORD)
+### ==========================================
+
+### Ứng viên nộp CV (Upload File lên Cloudinary)
+POST http://localhost:8080/api/applications/apply
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJkMUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ2MjAwNTYsImV4cCI6MTc3NDcwNjQ1Nn0.7LC4A7CGpgZZFfQIuWVhRji9fPbaKlgUhSHh7EeENwt24Rn7KceMh3OfeaLOP5hx
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="jobId"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="coverLetter"
+
+Chào anh/chị, em xin phép gửi CV file Word ạ!
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="cvFile"; filename="cv-test.docx"
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+< ./cv-test.docx
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Lấy danh sách công ty (Có mang theo Token)
+GET http://localhost:8080/api/companies
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJnaWFtZG9jX2FAZ21haWwuY29tIiwiaWF0IjoxNzc0NTI5ODQxLCJleHAiOjE3NzQ2MTYyNDF9.6tCh6hB5xXweDlkX4X2yHuyCeKdYI9l0lfB9iEeaGH_u0D-fHKKrfNriAK2KCmgr
+Accept: application/json
+### ==========================================
+### LUỒNG TEST ĐĂNG TIN VÀ DUYỆT TIN
+
+### 1. Đăng tin tuyển dụng mới (Cần Token đã đăng nhập)
+POST http://localhost:8080/api/jobs
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJiMUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ1OTg0NzEsImV4cCI6MTc3NDY4NDg3MX0.sR9miLePkSlcqGC1_9mssToULixytCF82u06xvMUcRRmyyu7-GZWebpGEwCP2ooy
+
+{
+  "title": "Lập trình viên Backend Java Spring Boot",
+  "description": "Tham gia phát triển dự án hệ thống tuyển dụng cực xịn. Cơ hội làm việc với các công nghệ mới nhất.",
+  "requirements": "- Có ít nhất 6 tháng kinh nghiệm Java.\n- Hiểu biết về Spring Security, JWT, RESTful API.",
+  "location": "Tòa nhà Keangnam, Nam Từ Liêm, Hà Nội",
+  "salary": 15000000,
+  "companyId": 1
+}
+
+### 2. (Admin) Test duyệt Job có ID = 1
+PUT http://localhost:8080/api/jobs/approve/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJuaGF0MUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ1OTg1MTQsImV4cCI6MTc3NDY4NDkxNH0.jqM0JlJVybHG8Yili-lPj2Gulq4X3-JZNccvaB_GJt_K9nJaId_AMyMp_kycZApJ
+
+
+### 3. Xem danh sách Job ngoài trang chủ (Ai cũng xem được, không cần Token)
+GET http://localhost:8080/api/jobs
+
+### 4. Gửi yêu cầu đăng ký làm Nhà tuyển dụng (Giả sử User đang đăng nhập có ID = 1)
+POST http://localhost:8080/api/companies/register/1
+Content-Type: application/json
+
+{
+  "name": "Công ty TNHH TopCV",
+  "taxCode": "0123456789",
+  "address": "Tòa nhà Gold Season, Thanh Xuân, Hà Nội"
+}
+### 5.Đăng ký tài khoản (Test Validate)
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn d",
+  "email": "d1@gmail.com",
+  "password": "1234567",
+  "confirmPassword": "1234567"
+}
+
+### Đăng nhập (Test lấy Token)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "b1@gmail.com",
+  "password": "1234567"
+}
+### Đăng nhập  ADMIN(Test lấy Token)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "nhat1@gmail.com",
+  "password": "1234567"
+}
+### Bước 2: Gửi yêu cầu đăng ký làm Nhà tuyển dụng
+POST http://localhost:8080/api/companies/register/4
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJiMUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ1OTgyODksImV4cCI6MTc3NDY4NDY4OX0.9zyhPLrmLeB9Vb0HE9l_aP7gEUwVCfnWs5Mo5k-A6cuQiXg3QuvodEkRYz_KXUXM
+
+
+{
+  "name": "Công ty b TNHH Công Nghệ Tương Lai",
+  "taxCode": "0101222267",
+  "address": "Tòa nhà b Keangnam, Nam Từ Liêm, Hà Nội"
+}
+
+### Bước 3: Admin duyệt công ty có ID = 1 (PUT)
+PUT http://localhost:8080/api/companies/approve/2
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJuaGF0MUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ1OTgzOTcsImV4cCI6MTc3NDY4NDc5N30.ZxhuBWXR27mDajhgxDBNmQHT6SNeZkLwGr7mRg8HOns5ZxrEdXWi4_SIzeXe5GXZ
+
+### ==========================================
+### LUỒNG QUẢN LÝ CV (ỨNG VIÊN & NHÀ TUYỂN DỤNG)
+### ==========================================
+
+### 1. Ứng viên xem lịch sử nộp CV của mình
+GET http://localhost:8080/api/applications/my-applications
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJkMUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ2MjAwNTYsImV4cCI6MTc3NDcwNjQ1Nn0.7LC4A7CGpgZZFfQIuWVhRji9fPbaKlgUhSHh7EeENwt24Rn7KceMh3OfeaLOP5hx
+
+### ------------------------------------------
+
+### 2. Nhà tuyển dụng xem ai đã nộp CV vào Job ID số 1
+GET http://localhost:8080/api/applications/job/1
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJiMUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ2MjE0NTIsImV4cCI6MTc3NDcwNzg1Mn0.2c8ewie4i-1KqtsZICuz84U1_VK97F3NmUW_Ogu4oAp0ipce8KIl82WeUdircFZd
+### ------------------------------------------
+
+### 3. Nhà tuyển dụng đổi trạng thái CV (Duyệt/Từ chối)
+# Thay số 1 ở đường dẫn bằng ID của cái JobApplication bạn vừa tạo
+# Trạng thái có thể là: REVIEWED (Đã xem), ACCEPTED (Hẹn phỏng vấn), REJECTED (Từ chối)
+PUT http://localhost:8080/api/applications/2/status?status=REJECTED
+Authorization: Bearer eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJuaGF0MUBnbWFpbC5jb20iLCJpYXQiOjE3NzQ2MjEzMjAsImV4cCI6MTc3NDcwNzcyMH0.YkMOFHBGO_HVnv3ygRAeY83iqSuLaHc9ZBWmjAeVCroRBh6k2dnwO2tth5dztigP
