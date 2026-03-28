@@ -39,22 +39,31 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
 
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Công khai: Ai cũng vào được
+                        // 1. PUBLIC: Khách vãng lai chưa đăng nhập cũng xem được
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
-                        // CHỈ CHO PHÉP TẤT CẢ MỌI NGƯỜI LẤY DỮ LIỆU (GET) TỪ JOB
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/jobs/**").permitAll()
+                        // 1.2: Cho phép xem danh sách/chi tiết Job và Công ty
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/jobs/**",
+                                "/api/companies/**").permitAll()
 
-                        // 2. Chỉ ADMIN mới được duyệt Công ty và duyệt/từ chối Job (PUT)
+                        // 2. ADMIN: Quyền quản trị hệ thống (Duyệt/Từ chối)
                         .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                 "/api/companies/approve/**",
                                 "/api/jobs/approve/**",
                                 "/api/jobs/reject/**").hasAuthority("ADMIN")
 
-                        // 3. Cho phép mở cửa riêng cho Swagger
+                        // 2.1: CHỈ "EMPLOYER" (Nhà tuyển dụng) mới được tạo/sửa Job
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/jobs", "/api/jobs/**").hasAuthority("EMPLOYER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/jobs/**").hasAuthority("EMPLOYER")
+
+                        // 2.3: CHỈ "CANDIDATE" (Ứng viên) mới được nộp CV
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/applications/**").hasAuthority("CANDIDATE")
+
+                        // 3. Cho phép mở cửa riêng cho giao diện Swagger API
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // 4. Các yêu cầu khác chỉ cần đăng nhập là được
+                        // 4. Các thao tác khác  thì cứ đăng nhập là được
                         .anyRequest().authenticated()
                 );
 
