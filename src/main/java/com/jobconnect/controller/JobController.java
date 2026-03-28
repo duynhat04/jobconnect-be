@@ -4,6 +4,7 @@ import com.jobconnect.dto.JobRequest;
 import com.jobconnect.entity.Job;
 import com.jobconnect.service.JobService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -72,6 +73,17 @@ public class JobController {
             return ResponseEntity.ok(jobService.searchJobs(keyword, location, minSalary, page, size));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi tìm kiếm: " + e.getMessage());
+        }
+    }
+    // API lấy chi tiết 1 Job theo ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getJobById(@PathVariable Long id) {
+        try {
+            Job job = jobService.getJobById(id);
+            return ResponseEntity.ok(job); // Trả về data Job
+        } catch (RuntimeException e) {
+            // Nếu không tìm thấy, trả về thông báo lỗi
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 }

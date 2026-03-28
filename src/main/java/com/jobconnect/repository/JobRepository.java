@@ -38,4 +38,6 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("minSalary") Long minSalary,
             Pageable pageable // <--- Thêm cái này
     );
+
+    Job getJobById(Long id);
 }

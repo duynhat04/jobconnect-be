@@ -21,6 +21,7 @@ public class JobService {
     @Autowired
     private CompanyRepository companyRepository;
 
+
     // 1. TẠO JOB MỚI (Dành cho Nhà tuyển dụng)
     public Job createJob(JobRequest jobRequest) {
         Company company = companyRepository.findById(jobRequest.getCompanyId())
@@ -78,5 +79,11 @@ public class JobService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         return jobRepository.searchAndFilterJobs(keyword, location, minSalary, pageable);
+    }
+
+    public Job getJobById(Long id) {
+        // Tìm job theo ID. Nếu không có thì ném ra lỗi RuntimeException
+        return jobRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc với ID: " + id));
     }
 }
