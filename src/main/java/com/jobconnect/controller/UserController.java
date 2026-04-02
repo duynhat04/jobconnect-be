@@ -23,8 +23,15 @@ public class UserController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            User savedUser = userService.registerUser(request);
-            return ResponseEntity.ok(savedUser);
+            // 1. Tạo user
+            User user = userService.registerUser(request);
+
+            // 2. Tạo token luôn
+            String token = jwtUtils.generateToken(user.getEmail());
+
+            // 3. Trả về giống login
+            return ResponseEntity.ok(new JwtResponse(token, user));
+
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

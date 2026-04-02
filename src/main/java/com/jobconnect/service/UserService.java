@@ -19,31 +19,31 @@ public class UserService {
     // Trông sạch sẽ và chuyên nghiệp hơn hẳn đúng không!
     public User registerUser(RegisterRequest request) {
 
-        // 1. Validate: Mật khẩu và Xác nhận mật khẩu phải giống nhau
+        // 1. Confirm password
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Lỗi: Mật khẩu xác nhận không khớp!");
+            throw new RuntimeException("Mật khẩu xác nhận không khớp!");
         }
 
-        // 2. Validate: Độ dài mật khẩu
+        // 2. Password length
         if (request.getPassword().length() < 6) {
-            throw new RuntimeException("Lỗi: Mật khẩu phải có ít nhất 6 ký tự!");
+            throw new RuntimeException("Mật khẩu phải >= 6 ký tự!");
         }
 
-        // 3. Validate: Định dạng Email
-        if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$")) {
-            throw new RuntimeException("Lỗi: Định dạng email không hợp lệ!");
+        // 3. Email format
+        if (!request.getEmail().matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+            throw new RuntimeException("Email không hợp lệ!");
         }
 
-        // 4. Validate: Email đã tồn tại chưa
+        // 4. Check email tồn tại
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Lỗi: Email này đã được đăng ký trong hệ thống!");
+            throw new RuntimeException("Email đã tồn tại!");
         }
 
+        // 5. Tạo user
         User user = new User();
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPassword(passwordEncoder.encode(request.getPassword())); // ✅ CHUẨN
         user.setRole("CANDIDATE");
 
         return userRepository.save(user);

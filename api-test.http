@@ -67,10 +67,10 @@ POST http://localhost:8080/api/users/register
 Content-Type: application/json
 
 {
-  "fullName": "Nguyễn Văn d",
-  "email": "d1@gmail.com",
-  "password": "1234567",
-  "confirmPassword": "1234567"
+  "fullName": "Nguyễn Văn ef",
+  "email": "ef1@gmail.com",
+  "password": "123456",
+  "confirmPassword": "123456"
 }
 
 ### Đăng nhập (Test lấy Token)
