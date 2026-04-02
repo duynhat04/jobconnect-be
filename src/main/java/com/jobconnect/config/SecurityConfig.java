@@ -32,13 +32,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // 🚀 BẬT CORS (Thay vì disable như cũ)
+                // BẬT CORS
                 .cors(Customizer.withDefaults())
 
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         // 1. PUBLIC: Khách vãng lai chưa đăng nhập cũng xem được
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
@@ -72,12 +73,12 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🚀 CẤU HÌNH CORS ĐỂ FRONTEND GỌI ĐƯỢC API
+    // CẤU HÌNH CORS ĐỂ FRONTEND GỌI ĐƯỢC API
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // ⚠️ NHỚ SỬA: Thay link Vercel của m vào đây nhé!
+
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "http://localhost:5173",

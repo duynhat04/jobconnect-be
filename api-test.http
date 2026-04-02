@@ -67,8 +67,8 @@ POST http://localhost:8080/api/users/register
 Content-Type: application/json
 
 {
-  "fullName": "Nguyễn Văn ef",
-  "email": "ef1@gmail.com",
+  "fullName": "Nguyễn Văn f",
+  "email": "f1@gmail.com",
   "password": "123456",
   "confirmPassword": "123456"
 }

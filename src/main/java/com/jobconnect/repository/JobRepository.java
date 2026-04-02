@@ -40,4 +40,9 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     );
 
     Job getJobById(Long id);
+    // Lọc Job theo trạng thái (Có phân trang cho trang quản lý của Admin)
+    Page<Job> findByStatus(String status, Pageable pageable);
+
+    // Tìm Job theo tiêu đề (Có phân trang cho trang quản lý của Admin)
+    Page<Job> findByTitleContainingIgnoreCase(String title, Pageable pageable);
 }
