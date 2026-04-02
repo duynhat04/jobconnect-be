@@ -44,8 +44,8 @@ public class SecurityConfig {
 
                         // 1.2: Cho phép xem danh sách/chi tiết Job và Công ty
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/jobs/**",
-                                "/api/companies/**").permitAll()
+                                "/api/jobs", "/api/jobs/**",
+                                "/api/companies", "/api/companies/**").permitAll()
 
                         // 2. ADMIN: Quyền quản trị hệ thống (Duyệt/Từ chối)
                         .requestMatchers(org.springframework.http.HttpMethod.PUT,
