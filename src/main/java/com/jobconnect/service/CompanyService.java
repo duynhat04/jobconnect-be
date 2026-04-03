@@ -102,4 +102,18 @@ public class CompanyService {
 
         return stats;
     }
+    // API Cập nhật thông tin công ty
+    public Company updateMyCompany(String email, Company updatedData) {
+        Company existingCompany = companyRepository.findByUser_Email(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty của bạn!"));
+
+        // Cập nhật các trường cho phép (Không cho phép đổi Mã số thuế, Trạng thái duyệt)
+        if (updatedData.getName() != null) existingCompany.setName(updatedData.getName());
+        if (updatedData.getAddress() != null) existingCompany.setAddress(updatedData.getAddress());
+        if (updatedData.getDescription() != null) existingCompany.setDescription(updatedData.getDescription());
+        if (updatedData.getLogo() != null) existingCompany.setLogo(updatedData.getLogo());
+        if (updatedData.getWebsite() != null) existingCompany.setWebsite(updatedData.getWebsite());
+
+        return companyRepository.save(existingCompany);
+    }
 }

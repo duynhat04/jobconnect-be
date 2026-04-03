@@ -139,4 +139,10 @@ public class JobApplicationService {
 
         return savedApp;
     }
+
+    // 4. Nhà tuyển dụng lấy TẤT CẢ CV đổ về công ty mình
+    public List<JobApplication> getAllApplicationsForMyCompany(String employerEmail) {
+        // Trực tiếp dùng hàm Repository vừa tạo
+        return applicationRepository.findByJob_Company_User_EmailOrderByIdDesc(employerEmail);
+    }
 }

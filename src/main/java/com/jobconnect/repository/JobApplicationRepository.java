@@ -18,4 +18,7 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     // --- THÊM VÀO ĐỂ ĐẾM TỔNG SỐ CV CỦA CÔNG TY ---
     @Query("SELECT COUNT(ja) FROM JobApplication ja WHERE ja.job.company.id = :companyId")
     long countTotalCVsByCompanyId(@org.springframework.data.repository.query.Param("companyId") Long companyId);
+
+    // Lấy danh sách tất cả ứng viên nộp vào công ty của nhà tuyển dụng (Sắp xếp mới nhất lên đầu)
+    List<JobApplication> findByJob_Company_User_EmailOrderByIdDesc(String email);
 }

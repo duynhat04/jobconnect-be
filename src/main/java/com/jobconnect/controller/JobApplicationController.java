@@ -97,4 +97,16 @@ public class JobApplicationController {
             return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
         }
     }
+
+    // Thêm API này để Nhà tuyển dụng lấy TẤT CẢ CV của công ty mình
+    @GetMapping("/employer/all")
+    public ResponseEntity<?> getAllCandidatesForMyCompany() {
+        try {
+            String email = getCurrentUserIdentifier();
+            // Lưu ý: Đảm bảo bạn đã thêm hàm getAllApplicationsForMyCompany() vào JobApplicationService như tui hướng dẫn lúc nãy nhé
+            return ResponseEntity.ok(applicationService.getAllApplicationsForMyCompany(email));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
+        }
+    }
 }

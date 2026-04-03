@@ -23,6 +23,12 @@ public class Company {
 
     private String address;
 
+    @Column(columnDefinition = "TEXT")
+    private String description; // Mô tả công ty (Dùng TEXT để lưu được nội dung dài)
+
+    private String logo; // Lưu link ảnh logo (Cloudinary)
+
+    private String website; // Link website công ty
     // Trạng thái: PENDING (Đang chờ duyệt), APPROVED (Đã duyệt), REJECTED (Từ chối)
     @Column(nullable = false)
     private String status = "PENDING";

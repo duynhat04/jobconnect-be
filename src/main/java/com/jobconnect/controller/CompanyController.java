@@ -71,4 +71,15 @@ public class CompanyController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    // API Cập nhật thông tin Công ty
+    @PutMapping("/my-profile")
+    public ResponseEntity<?> updateMyProfile(@RequestBody Company updatedData) {
+        try {
+            String email = getCurrentUserIdentifier();
+            Company savedCompany = companyService.updateMyCompany(email, updatedData);
+            return ResponseEntity.ok(savedCompany);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
