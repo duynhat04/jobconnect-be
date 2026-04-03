@@ -43,6 +43,10 @@ public class SecurityConfig {
                         // 1. PUBLIC: Khách vãng lai chưa đăng nhập cũng xem được
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
 
+                        // BẢO VỆ 2 API RIÊNG TƯ CỦA NHÀ TUYỂN DỤNG
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/jobs/my-jobs",
+                                "/api/companies/my-company").hasAuthority("EMPLOYER")
                         // 1.2: Cho phép xem danh sách/chi tiết Job và Công ty
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/jobs", "/api/jobs/**",

@@ -36,4 +36,26 @@ public class CompanyController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    // Thêm hàm phụ trợ lấy Email tương tự như bên JobController
+    private String getCurrentUserIdentifier() {
+        Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof com.jobconnect.entity.User) {
+            return ((com.jobconnect.entity.User) principal).getEmail();
+        } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            return ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+        }
+        return principal.toString();
+    }
+
+    // API Lấy thông tin Công ty của Nhà tuyển dụng đang đăng nhập
+    @GetMapping("/my-company")
+    public ResponseEntity<?> getMyCompany() {
+        try {
+            String email = getCurrentUserIdentifier();
+            return ResponseEntity.ok(companyService.getMyCompany(email));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

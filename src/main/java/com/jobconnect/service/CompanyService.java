@@ -61,4 +61,9 @@ public class CompanyService {
         // 5. Lưu lại thông tin Công ty
         return companyRepository.save(company);
     }
+
+    public Company getMyCompany(String email) {
+        return companyRepository.findByUser_Email(email)
+                .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký thông tin công ty hoặc tài khoản không tồn tại!"));
+    }
 }

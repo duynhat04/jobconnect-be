@@ -86,4 +86,13 @@ public class JobService {
         return jobRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc với ID: " + id));
     }
+
+    // Lấy danh sách Job của một Nhà tuyển dụng cụ thể
+    public List<Job> getMyJobs(String email) {
+        // Tùy thuộc vào cách bạn thiết kế Database, thường là Job -> Company -> User
+        return jobRepository.findByCompany_User_Email(email);
+
+        // (Ghi chú: Nếu Entity User của bạn dùng trường 'username' thay vì 'email',
+        // thì đổi tên hàm của Repository ở dưới thành findByCompany_User_Username)
+    }
 }

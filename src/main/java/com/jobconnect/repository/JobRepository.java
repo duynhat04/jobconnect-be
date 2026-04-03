@@ -45,4 +45,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     // Tìm Job theo tiêu đề (Có phân trang cho trang quản lý của Admin)
     Page<Job> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
+    // Lấy tất cả các Job thuộc về Company mà Company đó lại do User (email) sở hữu
+    List<Job> findByCompany_User_Email(String email);
 }

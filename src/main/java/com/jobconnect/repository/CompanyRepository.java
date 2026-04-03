@@ -24,4 +24,6 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     // Tìm kiếm công ty theo tên (có phân trang)
     Page<Company> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
+    // Lấy Company dựa vào Email của User sở hữu
+    java.util.Optional<Company> findByUser_Email(String email);
 }

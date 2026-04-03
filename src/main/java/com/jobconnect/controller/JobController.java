@@ -37,7 +37,27 @@ public class JobController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    // Hàm phụ trợ: Lấy Email/Username từ Token
+    private String getCurrentUserIdentifier() {
+        Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof com.jobconnect.entity.User) {
+            return ((com.jobconnect.entity.User) principal).getEmail(); // Hoặc getUsername()
+        } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            return ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+        }
+        return principal.toString();
+    }
 
+    // API Lấy danh sách tin đã đăng của riêng Công ty đang đăng nhập
+    @GetMapping("/my-jobs")
+    public ResponseEntity<?> getMyJobs() {
+        try {
+            String email = getCurrentUserIdentifier();
+            return ResponseEntity.ok(jobService.getMyJobs(email));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
+        }
+    }
     // --- API CHO ADMIN ---
 
     // Admin duyệt Job
