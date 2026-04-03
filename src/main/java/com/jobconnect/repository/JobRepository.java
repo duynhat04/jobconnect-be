@@ -48,4 +48,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     // Lấy tất cả các Job thuộc về Company mà Company đó lại do User (email) sở hữu
     List<Job> findByCompany_User_Email(String email);
+
+    // --- THÊM VÀO ĐỂ ĐẾM SỐ LƯỢNG JOB ĐANG ACTIVE ---
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.company.id = :companyId AND j.status = 'APPROVED'")
+    long countActiveJobsByCompanyId(@Param("companyId") Long companyId);
 }

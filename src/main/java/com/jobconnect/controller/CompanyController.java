@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/companies")
 @CrossOrigin("*")
@@ -54,6 +56,17 @@ public class CompanyController {
         try {
             String email = getCurrentUserIdentifier();
             return ResponseEntity.ok(companyService.getMyCompany(email));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    // API Lấy thống kê cho Dashboard
+    @GetMapping("/my-stats")
+    public ResponseEntity<?> getDashboardStats() {
+        try {
+            String email = getCurrentUserIdentifier(); // Hàm này đã có sẵn trong CompanyController của bạn
+            Map<String, Object> stats = companyService.getCompanyStats(email);
+            return ResponseEntity.ok(stats);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

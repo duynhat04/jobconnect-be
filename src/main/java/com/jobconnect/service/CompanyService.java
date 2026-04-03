@@ -3,9 +3,14 @@ package com.jobconnect.service;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.User;
 import com.jobconnect.repository.CompanyRepository;
+import com.jobconnect.repository.JobApplicationRepository;
+import com.jobconnect.repository.JobRepository;
 import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class CompanyService {
@@ -15,6 +20,12 @@ public class CompanyService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
+
+    @Autowired
+    private JobApplicationRepository jobApplicationRepository;
 
     public Company registerCompany(Long userId, Company company) {
         // Chốt chặn 1: Kiểm tra User có tồn tại trong hệ thống không
@@ -65,5 +76,30 @@ public class CompanyService {
     public Company getMyCompany(String email) {
         return companyRepository.findByUser_Email(email)
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký thông tin công ty hoặc tài khoản không tồn tại!"));
+    }
+
+    public Map<String, Object> getCompanyStats(String email) {
+        // 1. Tìm công ty của người đang đăng nhập
+        Company company = companyRepository.findByUser_Email(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty của bạn!"));
+
+        Long companyId = company.getId();
+
+        // 2. Gọi các hàm COUNT từ Repository
+        long activeJobs = jobRepository.countActiveJobsByCompanyId(companyId);
+        long totalCVs = jobApplicationRepository.countTotalCVsByCompanyId(companyId);
+
+        // 3. Fake data tạm cho 2 thông số chưa có bảng (Sau này có bảng Views thì sửa sau)
+        long profileViews = 120 + (companyId * 5); // Tạo số ngẫu nhiên cho đẹp
+        String responseRate = "85%";
+
+        // 4. Đóng gói vào Map rồi trả về
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("activeJobs", activeJobs);
+        stats.put("totalCVs", totalCVs);
+        stats.put("profileViews", profileViews);
+        stats.put("responseRate", responseRate);
+
+        return stats;
     }
 }
