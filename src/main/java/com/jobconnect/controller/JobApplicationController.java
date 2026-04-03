@@ -33,9 +33,6 @@ public class JobApplicationController {
                 // Ép kiểu về User và lấy email
                 email = ((com.jobconnect.entity.User) principal).getEmail();
 
-                // LƯU Ý: Nếu Entity User của bạn không có hàm getEmail() mà dùng getUsername()
-                // thì bạn sửa lại thành .getUsername() ở dòng trên nhé!
-
             } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
                 email = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
             } else {

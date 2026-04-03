@@ -60,7 +60,7 @@ public class SecurityConfig {
 
                         // 2.1: CHỈ "EMPLOYER" (Nhà tuyển dụng) mới được tạo/sửa Job
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/jobs", "/api/jobs/**").hasAuthority("EMPLOYER")
-                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/jobs/**").hasAuthority("EMPLOYER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/jobs/**", "/api/companies/my-profile").hasAuthority("EMPLOYER")
 
                         // 2.3: CHỈ "CANDIDATE" (Ứng viên) mới được nộp CV
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/applications/**").hasAuthority("CANDIDATE")

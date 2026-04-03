@@ -22,10 +22,12 @@ public class JobService {
     private CompanyRepository companyRepository;
 
 
-    // 1. TẠO JOB MỚI (Dành cho Nhà tuyển dụng)
-    public Job createJob(JobRequest jobRequest) {
-        Company company = companyRepository.findById(jobRequest.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty này!"));
+    // 1. TẠO JOB MỚI (Dành cho Nhà tuyển dụng) - Đã bảo mật bằng Email từ Token
+    public Job createJob(JobRequest jobRequest, String employerEmail) { // Nhận thêm email từ Controller
+
+        // Dùng email của người đang đăng nhập để tự động móc ra đúng công ty của họ
+        Company company = companyRepository.findByUser_Email(employerEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty của bạn. Vui lòng cập nhật hồ sơ công ty!"));
 
         // CHẶN BẢO VỆ: Công ty phải được duyệt thì mới có quyền đăng tin
         if (company.getStatus() == null || !company.getStatus().equals("APPROVED")) {

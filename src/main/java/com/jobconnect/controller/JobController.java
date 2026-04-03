@@ -32,7 +32,10 @@ public class JobController {
     @PostMapping
     public ResponseEntity<?> createJob(@RequestBody JobRequest jobRequest) {
         try {
-            return ResponseEntity.ok(jobService.createJob(jobRequest));
+            // Lấy email từ hàm phụ trợ getCurrentUserIdentifier() của sếp
+            String email = getCurrentUserIdentifier();
+            Job createdJob = jobService.createJob(jobRequest, email);
+            return ResponseEntity.ok(createdJob);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

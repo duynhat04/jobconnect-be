@@ -64,7 +64,7 @@ public class CompanyController {
     @GetMapping("/my-stats")
     public ResponseEntity<?> getDashboardStats() {
         try {
-            String email = getCurrentUserIdentifier(); // Hàm này đã có sẵn trong CompanyController của bạn
+            String email = getCurrentUserIdentifier();
             Map<String, Object> stats = companyService.getCompanyStats(email);
             return ResponseEntity.ok(stats);
         } catch (RuntimeException e) {
