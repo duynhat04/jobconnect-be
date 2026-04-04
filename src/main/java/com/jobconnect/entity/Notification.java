@@ -21,6 +21,10 @@ public class Notification {
 
     private String title;
     private String message;
+
+    // THÊM 2 CỘT NÀY VÀO:
+    private String type;
+    private String targetUrl;
     private boolean isRead = false;
     private LocalDateTime createdAt = LocalDateTime.now();
 }

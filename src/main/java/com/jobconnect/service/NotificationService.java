@@ -30,4 +30,19 @@ public class NotificationService {
         notif.setRead(true);
         return notificationRepository.save(notif);
     }
+
+    // THÊM HÀM TẠO THÔNG BÁO MỚI
+    public Notification createNotification(Long userId, String title, String message, String type, String targetUrl) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+        Notification notif = new Notification();
+        notif.setUser(user);
+        notif.setTitle(title);
+        notif.setMessage(message);
+        notif.setType(type);
+        notif.setTargetUrl(targetUrl);
+
+        return notificationRepository.save(notif);
+    }
 }

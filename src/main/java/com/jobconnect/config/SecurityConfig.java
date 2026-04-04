@@ -3,18 +3,18 @@ package com.jobconnect.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer; // Thêm cái này
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration; // Thêm cái này
-import org.springframework.web.cors.CorsConfigurationSource; // Thêm cái này
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // Thêm cái này
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays; // Thêm cái này
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -64,11 +64,14 @@ public class SecurityConfig {
 
                         // 2.3: CHỈ "CANDIDATE" (Ứng viên) mới được nộp CV
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/applications/**").hasAuthority("CANDIDATE")
-                        .requestMatchers("/api/cv/**", "/api/notifications/**").hasAuthority("CANDIDATE")
+
+                        .requestMatchers("/api/cv/**").hasAuthority("CANDIDATE")
+
                         // 3. Cho phép mở cửa riêng cho giao diện Swagger API
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // 4. Các thao tác khác  thì cứ đăng nhập là được
+                        // 4. Các thao tác khác thì cứ đăng nhập (có Token hợp lệ) là được
+                        // (API /api/notifications/** sẽ rơi vào trường hợp này)
                         .anyRequest().authenticated()
                 );
 
@@ -81,7 +84,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
 
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
