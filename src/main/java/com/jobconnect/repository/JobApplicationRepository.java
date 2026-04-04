@@ -1,6 +1,8 @@
 package com.jobconnect.repository;
 
+import com.jobconnect.entity.Job;
 import com.jobconnect.entity.JobApplication;
+import com.jobconnect.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -9,6 +11,8 @@ import java.util.List;
 
 @Repository
 public interface JobApplicationRepository extends JpaRepository<JobApplication, Long> {
+
+    boolean existsByUserAndJob(User user, Job job);
     // Để sau này Nhà tuyển dụng xem danh sách CV nộp vào Job của họ
     List<JobApplication> findByJobId(Long jobId);
 

@@ -5,8 +5,10 @@ import com.cloudinary.utils.ObjectUtils;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.JobApplication;
 import com.jobconnect.entity.User;
+import com.jobconnect.entity.UserCV;
 import com.jobconnect.repository.JobApplicationRepository;
 import com.jobconnect.repository.JobRepository;
+import com.jobconnect.repository.UserCVRepository;
 import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,11 +30,75 @@ public class JobApplicationService {
     private UserRepository userRepository;
 
     @Autowired
+    private UserCVRepository userCVRepository;
+
+    @Autowired
     private Cloudinary cloudinary;
 
     @Autowired
     private EmailService emailService;
 
+    private void checkDuplicateApplication(User user, Job job) {
+        if (applicationRepository.existsByUserAndJob(user, job)) {
+            throw new RuntimeException("Bạn đã ứng tuyển vào công việc này rồi! Vui lòng chờ phản hồi từ nhà tuyển dụng.");
+        }
+    }
+
+    // LUỒNG 1: TẢI CV MỚI LÊN (Upload Cloudinary)
+    public JobApplication applyWithNewCV(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter) throws Exception {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
+
+        // KIỂM TRA TRÙNG LẶP Ở ĐÂY (NẾU TRÙNG LÀ VĂNG LỖI LUÔN, KHÔNG CHẠY XUỐNG DƯỚI NỮA)
+        checkDuplicateApplication(user, job);
+        // Đẩy lên Cloudinary lấy link
+        Map<String, Object> uploadOptions = new java.util.HashMap<>();
+        uploadOptions.put("resource_type", "auto");
+        Map uploadResult = cloudinary.uploader().upload(cvFile.getBytes(), uploadOptions);
+        String cvUrl = uploadResult.get("secure_url").toString();
+
+        // Lưu thông tin ứng tuyển
+        JobApplication application = new JobApplication();
+        application.setUser(user);
+        application.setJob(job);
+        application.setCvUrl(cvUrl);
+        application.setCoverLetter(coverLetter);
+        // application.setStatus("PENDING"); // Tuỳ DB ông set default chưa
+
+        return applicationRepository.save(application);
+    }
+
+    // LUỒNG 2: DÙNG CV ĐÃ LƯU TRONG HỆ THỐNG (Không cần gọi Cloudinary)
+    public JobApplication applyWithExistingCV(String userEmail, Long jobId, Long userCvId, String coverLetter) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
+
+        // KIỂM TRA TRÙNG LẶP Ở ĐÂY
+        checkDuplicateApplication(user, job);
+        // Tìm cái CV mà user đã chọn
+        UserCV userCV = userCVRepository.findById(userCvId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy CV đã lưu!"));
+
+        // Bảo mật: Kiểm tra xem cái CV đó có đúng là của thằng đang nộp không (chống hacker truyền ID bậy bạ)
+        if (!userCV.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Lỗi bảo mật: Bạn không có quyền sử dụng CV này!");
+        }
+
+        // Tạo hồ sơ ứng tuyển, BÊ NGUYÊN CÁI LINK TỪ BẢNG UserCV SANG LÀ XONG
+        JobApplication application = new JobApplication();
+        application.setUser(user);
+        application.setJob(job);
+        application.setCvUrl(userCV.getFileUrl()); // Trực tiếp dùng link đã lưu
+        application.setCoverLetter(coverLetter);
+
+        return applicationRepository.save(application);
+    }
     public JobApplication applyJob(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter) throws Exception {
 
         // 1. Tìm người dùng (Ứng viên đang đăng nhập)

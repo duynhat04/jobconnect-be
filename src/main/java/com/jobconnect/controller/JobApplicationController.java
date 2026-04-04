@@ -1,12 +1,18 @@
 package com.jobconnect.controller;
 
+import com.jobconnect.dto.ApplyExistingDto;
+import com.jobconnect.entity.Job;
 import com.jobconnect.entity.JobApplication;
+import com.jobconnect.entity.User;
 import com.jobconnect.service.JobApplicationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.security.Principal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -104,6 +110,38 @@ public class JobApplicationController {
             return ResponseEntity.ok(applicationService.getAllApplicationsForMyCompany(email));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
+        }
+    }
+
+    // API 1: Nộp bằng file mới tải lên (FormData)
+    @PostMapping("/apply-new")
+    public ResponseEntity<?> applyNew(
+            @RequestParam("jobId") Long jobId,
+            @RequestParam("cvFile") MultipartFile cvFile,
+            @RequestParam(value = "coverLetter", required = false) String coverLetter,
+            Principal principal) {
+        try {
+            // Lấy email user đang đăng nhập (Tùy theo cấu hình JWT của ông, có thể lấy từ principal.getName() hoặc custom logic)
+            String email = principal.getName();
+            JobApplication app = applicationService.applyWithNewCV(email, jobId, cvFile, coverLetter);
+            return ResponseEntity.ok(app);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // API 2: Nộp bằng CV đã có sẵn (JSON Body)
+    @PostMapping("/apply-existing")
+    public ResponseEntity<?> applyExisting(
+            @RequestParam("jobId") Long jobId,
+            @RequestBody ApplyExistingDto request,
+            Principal principal) {
+        try {
+            String email = principal.getName();
+            JobApplication app = applicationService.applyWithExistingCV(email, jobId, request.getUserCvId(), request.getCoverLetter());
+            return ResponseEntity.ok(app);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 }
