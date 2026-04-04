@@ -62,4 +62,17 @@ public class UserService {
         // Bước 3: Đăng nhập thành công, trả về thông tin User
         return user;
     }
+    public void changePassword(String email, String oldPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+        // Kiểm tra mật khẩu cũ có khớp không
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu cũ không chính xác!");
+        }
+
+        // Mã hóa mật khẩu mới và lưu lại
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 }

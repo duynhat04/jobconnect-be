@@ -24,6 +24,14 @@ public class User {
 
     private String fullName;
 
+    // Thêm các trường cho trang Profile
+    private String phone;
+    private String address;
+    private String avatarUrl; // Chứa link ảnh mảng
+
+    @Column(columnDefinition = "TEXT")
+    private String bio; // Giới thiệu bản thân
+
     // Mặc định ai đăng ký cũng là Ứng viên
     @Column(nullable = false)
     private String role = "CANDIDATE";

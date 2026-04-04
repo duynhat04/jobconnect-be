@@ -64,7 +64,7 @@ public class SecurityConfig {
 
                         // 2.3: CHỈ "CANDIDATE" (Ứng viên) mới được nộp CV
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/applications/**").hasAuthority("CANDIDATE")
-
+                        .requestMatchers("/api/cv/**", "/api/notifications/**").hasAuthority("CANDIDATE")
                         // 3. Cho phép mở cửa riêng cho giao diện Swagger API
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 

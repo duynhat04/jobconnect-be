@@ -53,4 +53,14 @@ public class UserController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody com.jobconnect.dto.ChangePasswordRequest request) {
+        try {
+            String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+            userService.changePassword(email, request.getOldPassword(), request.getNewPassword());
+            return ResponseEntity.ok("Đổi mật khẩu thành công!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
