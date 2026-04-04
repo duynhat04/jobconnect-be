@@ -30,4 +30,14 @@ public class NotificationController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @PutMapping("/read-all")
+    public ResponseEntity<?> markAllAsRead() {
+        try {
+            notificationService.markAllAsRead(getCurrentUserEmail());
+            return ResponseEntity.ok("Đã đánh dấu đọc tất cả");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

@@ -12,4 +12,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     // Đếm số lượng chưa đọc
     long countByUserIdAndIsReadFalse(Long userId);
+
+    List<Notification> findByUserIdAndIsReadFalse(Long userId);
 }

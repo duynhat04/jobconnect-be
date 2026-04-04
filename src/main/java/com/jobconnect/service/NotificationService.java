@@ -45,4 +45,21 @@ public class NotificationService {
 
         return notificationRepository.save(notif);
     }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void markAllAsRead(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+        // Lấy hết thông báo CHƯA ĐỌC của user này ra
+        List<Notification> unreadNotifs = notificationRepository.findByUserIdAndIsReadFalse(user.getId());
+
+        // Set thành đã đọc hết
+        for (Notification notif : unreadNotifs) {
+            notif.setRead(true);
+        }
+
+        // Lưu lại 1 loạt vào DB
+        notificationRepository.saveAll(unreadNotifs);
+    }
 }
