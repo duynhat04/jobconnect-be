@@ -38,6 +38,9 @@ public class JobApplicationService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private NotificationService notificationService;
+
     private void checkDuplicateApplication(User user, Job job) {
         if (applicationRepository.existsByUserAndJob(user, job)) {
             throw new RuntimeException("Bạn đã ứng tuyển vào công việc này rồi! Vui lòng chờ phản hồi từ nhà tuyển dụng.");
@@ -52,8 +55,9 @@ public class JobApplicationService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
 
-        // KIỂM TRA TRÙNG LẶP Ở ĐÂY (NẾU TRÙNG LÀ VĂNG LỖI LUÔN, KHÔNG CHẠY XUỐNG DƯỚI NỮA)
+        // KIỂM TRA TRÙNG LẶP Ở ĐÂY
         checkDuplicateApplication(user, job);
+
         // Đẩy lên Cloudinary lấy link
         Map<String, Object> uploadOptions = new java.util.HashMap<>();
         uploadOptions.put("resource_type", "auto");
@@ -66,9 +70,23 @@ public class JobApplicationService {
         application.setJob(job);
         application.setCvUrl(cvUrl);
         application.setCoverLetter(coverLetter);
-        // application.setStatus("PENDING"); // Tuỳ DB ông set default chưa
 
-        return applicationRepository.save(application);
+        JobApplication savedApplication = applicationRepository.save(application);
+
+        // BẮN THÔNG BÁO CHO NHÀ TUYỂN DỤNG
+        try {
+            notificationService.createNotification(
+                    savedApplication.getJob().getCompany().getUser().getId(),
+                    "Có ứng tuyển mới!",
+                    "Ứng viên " + savedApplication.getUser().getFullName() + " vừa nộp CV vào vị trí " + savedApplication.getJob().getTitle(),
+                    "NEW_APPLICATION",
+                    "/employer/manage-applications"
+            );
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi bắn thông báo: " + e.getMessage());
+        }
+
+        return savedApplication;
     }
 
     // LUỒNG 2: DÙNG CV ĐÃ LƯU TRONG HỆ THỐNG (Không cần gọi Cloudinary)
@@ -81,52 +99,79 @@ public class JobApplicationService {
 
         // KIỂM TRA TRÙNG LẶP Ở ĐÂY
         checkDuplicateApplication(user, job);
+
         // Tìm cái CV mà user đã chọn
         UserCV userCV = userCVRepository.findById(userCvId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy CV đã lưu!"));
 
-        // Bảo mật: Kiểm tra xem cái CV đó có đúng là của thằng đang nộp không (chống hacker truyền ID bậy bạ)
+        // Bảo mật: Kiểm tra xem cái CV đó có đúng là của thằng đang nộp không
         if (!userCV.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("Lỗi bảo mật: Bạn không có quyền sử dụng CV này!");
         }
 
-        // Tạo hồ sơ ứng tuyển, BÊ NGUYÊN CÁI LINK TỪ BẢNG UserCV SANG LÀ XONG
+        // Tạo hồ sơ ứng tuyển
         JobApplication application = new JobApplication();
         application.setUser(user);
         application.setJob(job);
-        application.setCvUrl(userCV.getFileUrl()); // Trực tiếp dùng link đã lưu
+        application.setCvUrl(userCV.getFileUrl());
         application.setCoverLetter(coverLetter);
 
-        return applicationRepository.save(application);
-    }
-    public JobApplication applyJob(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter) throws Exception {
+        JobApplication savedApplication = applicationRepository.save(application);
 
-        // 1. Tìm người dùng (Ứng viên đang đăng nhập)
+        // BẮN THÔNG BÁO CHO NHÀ TUYỂN DỤNG
+        try {
+            notificationService.createNotification(
+                    savedApplication.getJob().getCompany().getUser().getId(),
+                    "Có ứng tuyển mới!",
+                    "Ứng viên " + savedApplication.getUser().getFullName() + " vừa sử dụng CV đã lưu để nộp vào vị trí " + savedApplication.getJob().getTitle(),
+                    "NEW_APPLICATION",
+                    "/employer/manage-applications"
+            );
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi bắn thông báo: " + e.getMessage());
+        }
+
+        return savedApplication;
+    }
+
+    // LUỒNG 3: NỘP CV CHUNG
+    public JobApplication applyJob(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter) throws Exception {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        // 2. Tìm công việc muốn nộp
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
 
-        // 3. ĐẨY FILE LÊN CLOUDINARY
-        // Báo cho Cloudinary biết hãy tự động nhận diện loại file (auto) thay vì mặc định là ảnh
         Map<String, Object> uploadOptions = new java.util.HashMap<>();
         uploadOptions.put("resource_type", "auto");
 
         Map uploadResult = cloudinary.uploader().upload(cvFile.getBytes(), uploadOptions);
-        // Lấy đường link URL an toàn (https) từ kết quả của Cloudinary
         String cvUrl = uploadResult.get("secure_url").toString();
 
-        // 4. Lưu thông tin vào Database
         JobApplication application = new JobApplication();
         application.setUser(user);
         application.setJob(job);
-        application.setCvUrl(cvUrl); // Lưu link vừa lấy được
+        application.setCvUrl(cvUrl);
         application.setCoverLetter(coverLetter);
 
-        return applicationRepository.save(application);
+        JobApplication savedApplication = applicationRepository.save(application);
+
+        // BẮN THÔNG BÁO CHO NHÀ TUYỂN DỤNG
+        try {
+            notificationService.createNotification(
+                    savedApplication.getJob().getCompany().getUser().getId(),
+                    "Có ứng tuyển mới!",
+                    "Ứng viên " + savedApplication.getUser().getFullName() + " vừa nộp CV vào vị trí " + savedApplication.getJob().getTitle(),
+                    "NEW_APPLICATION",
+                    "/employer/manage-applications"
+            );
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi bắn thông báo: " + e.getMessage());
+        }
+
+        return savedApplication;
     }
+
     // 1. Ứng viên xem lịch sử nộp CV của chính mình
     public List<JobApplication> getMyApplications(String email) {
         User user = userRepository.findByEmail(email)
@@ -136,22 +181,16 @@ public class JobApplicationService {
 
     // 2. Nhà tuyển dụng xem danh sách ứng viên nộp vào 1 Job
     public List<JobApplication> getApplicationsForJob(Long jobId, String employerEmail) {
-
-        // 1. Tìm tài khoản Nhà tuyển dụng đang đăng nhập
-        User employer = userRepository.findByEmail(employerEmail) // (Hoặc findByUsername tùy bạn)
+        User employer = userRepository.findByEmail(employerEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        // 2. Tìm Job muốn xem
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc!"));
 
-        // 3. CHỐNG XEM TRỘM CV CỦA CÔNG TY KHÁC:
-        // Lấy ID của người tạo ra công ty chứa Job này, so sánh với ID của người đang đăng nhập
         if (!job.getCompany().getUser().getId().equals(employer.getId())) {
             throw new RuntimeException("LỖI BẢO MẬT: Bạn không có quyền xem CV của công ty khác!");
         }
 
-        // Vượt qua vòng kiểm tra thì mới cho lấy danh sách CV
         return applicationRepository.findByJobId(jobId);
     }
 
@@ -173,9 +212,23 @@ public class JobApplicationService {
         application.setStatus(newStatus.toUpperCase());
         JobApplication savedApp = applicationRepository.save(application);
 
+        // BẮN THÔNG BÁO CHO ỨNG VIÊN TRƯỚC
+        try {
+            String statusVN = "ACCEPTED".equalsIgnoreCase(newStatus) ? "được CHẤP NHẬN" : "bị TỪ CHỐI";
+            notificationService.createNotification(
+                    savedApp.getUser().getId(), // Bắn về ID của Ứng viên
+                    "Cập nhật trạng thái ứng tuyển",
+                    "Hồ sơ của bạn tại vị trí " + savedApp.getJob().getTitle() + " đã " + statusVN,
+                    "APPLICATION_STATUS",
+                    "/candidate/my-applications"
+            );
+        } catch (Exception e) {
+            System.err.println("⚠️ Lỗi bắn thông báo: " + e.getMessage());
+        }
+
         // BẮN EMAIL TỰ ĐỘNG CHO ỨNG VIÊN
         try {
-            String candidateEmail = application.getUser().getEmail(); // Lấy email của ứng viên nộp CV
+            String candidateEmail = application.getUser().getEmail();
             String jobTitle = application.getJob().getTitle();
             String companyName = application.getJob().getCompany().getName();
 
@@ -208,7 +261,6 @@ public class JobApplicationService {
 
     // 4. Nhà tuyển dụng lấy TẤT CẢ CV đổ về công ty mình
     public List<JobApplication> getAllApplicationsForMyCompany(String employerEmail) {
-        // Trực tiếp dùng hàm Repository vừa tạo
         return applicationRepository.findByJob_Company_User_EmailOrderByIdDesc(employerEmail);
     }
 }
