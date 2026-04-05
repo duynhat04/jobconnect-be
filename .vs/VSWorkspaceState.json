@@ -1,0 +1,15 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\src\\main",
+    "\\src\\main\\java",
+    "\\src\\main\\java\\com",
+    "\\src\\main\\java\\com\\jobconnect",
+    "\\src\\main\\java\\com\\jobconnect\\controller",
+    "\\src\\main\\java\\com\\jobconnect\\entity",
+    "\\src\\main\\java\\com\\jobconnect\\service"
+  ],
+  "SelectedNode": "\\src\\main\\java\\com\\jobconnect\\controller\\CompanyController.java",
+  "PreviewInSolutionExplorer": false
+}

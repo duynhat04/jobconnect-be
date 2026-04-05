@@ -83,8 +83,26 @@ public class AdminServiceImpl implements AdminService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty với ID: " + companyId));
 
-        // Cập nhật trạng thái mới
+        // Cập nhật trạng thái mới cho Company
         company.setStatus(status);
+
+        // Nếu Admin bấm "Duyệt" (truyền lên APPROVED)
+        if ("APPROVED".equalsIgnoreCase(status)) {
+            User user = company.getUser();
+            // Nâng cấp user lên Nhà tuyển dụng nếu họ chưa phải là EMPLOYER
+            if (user != null && !"EMPLOYER".equals(user.getRole())) {
+                user.setRole("EMPLOYER");
+                userRepository.save(user); 
+            }
+        } 
+        // Khi Admin lỡ tay duyệt rồi nhưng sau đó đổi ý thành REJECTED 
+        else if ("REJECTED".equalsIgnoreCase(status)) {
+             User user = company.getUser();
+             if (user != null && "EMPLOYER".equals(user.getRole())) {
+                 user.setRole("USER");
+                 userRepository.save(user);
+             }
+        }
 
         // Lưu lại vào Database
         return companyRepository.save(company);

@@ -28,16 +28,16 @@ public class CompanyController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-    // API để Admin duyệt công ty
-    @PutMapping("/approve/{companyId}")
-    public ResponseEntity<?> approveCompany(@PathVariable Long companyId) {
-        try {
-            Company approvedCompany = companyService.approveCompany(companyId);
-            return ResponseEntity.ok(approvedCompany);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
+    // // API để Admin duyệt công ty
+    // @PutMapping("/approve/{companyId}")
+    // public ResponseEntity<?> approveCompany(@PathVariable Long companyId) {
+    //     try {
+    //         Company approvedCompany = companyService.approveCompany(companyId);
+    //         return ResponseEntity.ok(approvedCompany);
+    //     } catch (RuntimeException e) {
+    //         return ResponseEntity.badRequest().body(e.getMessage());
+    //     }
+    // }
 
     // Thêm hàm phụ trợ lấy Email tương tự như bên JobController
     private String getCurrentUserIdentifier() {
