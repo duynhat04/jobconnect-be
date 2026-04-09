@@ -22,6 +22,7 @@ public class UserCV {
     private String cvName; // Tên gợi nhớ (VD: CV Backend 2024)
     private String fileUrl; // Link file đã upload (Cloudinary/S3 hoặc thư mục local)
 
+    private String cloudinaryPublicId;
     private boolean isDefault = false; // Đánh dấu CV chính
 
     private LocalDateTime uploadedAt = LocalDateTime.now();

@@ -74,4 +74,19 @@ public class AdminController {
 
         return ResponseEntity.ok(adminService.getAllUsers(page, size, search));
     }
+
+    // LẤY DANH SÁCH CV CỦA 1 ỨNG VIÊN CỤ THỂ (Để Admin click vào user thì hiện ra CV)
+    @GetMapping("/users/{id}/cvs")
+    public ResponseEntity<?> getCandidateCVs(@PathVariable Long id) {
+        // Mày có thể gọi thẳng UserCVService ở đây, hoặc viết thêm hàm getCandidateCVs trong AdminService
+        return ResponseEntity.ok(adminService.getCandidateCVs(id)); 
+    }
+
+    // KHÓA / MỞ KHÓA TÀI KHOẢN ỨNG VIÊN
+    @PutMapping("/users/{id}/status")
+    public ResponseEntity<User> updateUserStatus(
+            @PathVariable Long id,
+            @RequestParam boolean isActive) { // Hoặc dùng String status tùy design DB của m
+        return ResponseEntity.ok(adminService.updateUserStatus(id, isActive));
+    }
 }

@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/cv")
-@CrossOrigin("*") // Chỗ này để nguyên cũng được vì ông đã config CORS ở SecurityConfig rồi
+@CrossOrigin("*") 
 public class UserCVController {
 
     @Autowired
@@ -34,7 +34,7 @@ public class UserCVController {
         try {
             return ResponseEntity.ok(userCVService.uploadCV(getCurrentUserEmail(), file, cvName));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Lỗi khi upload CV: " + e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -45,6 +45,17 @@ public class UserCVController {
             return ResponseEntity.ok("Đã xóa CV thành công!");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi khi xóa: " + e.getMessage());
+        }
+    }
+
+    // Đặt làm CV mặc định
+    @PutMapping("/{id}/set-default")
+    public ResponseEntity<?> setDefaultCV(@PathVariable Long id) {
+        try {
+            userCVService.setDefaultCV(id, getCurrentUserEmail());
+            return ResponseEntity.ok("Đã cập nhật CV mặc định thành công!");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
         }
     }
 }

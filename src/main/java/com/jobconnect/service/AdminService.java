@@ -4,6 +4,9 @@ import com.jobconnect.dto.DashboardStatsDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.User;
+import com.jobconnect.entity.UserCV;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 
 public interface AdminService {
@@ -24,4 +27,10 @@ public interface AdminService {
 
     // Lấy danh sách Ứng viên / User (Có phân trang)
     Page<User> getAllUsers(int page, int size, String search);
+
+    // Lấy danh sách CV của ứng viên cho Admin xem
+    List<UserCV> getCandidateCVs(Long userId);
+
+    // Khóa / Mở khóa tài khoản ứng viên (Ban/Unban)
+    User updateUserStatus(Long userId, boolean isActive);
 }

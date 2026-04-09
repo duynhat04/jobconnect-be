@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import com.jobconnect.entity.UserCV;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +25,7 @@ public class AdminServiceImpl implements AdminService {
     private final CompanyRepository companyRepository;
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
+    private final UserCVRepository userCVRepository;
 
     @Override
     public DashboardStatsDTO getDashboardStats() {
@@ -148,5 +150,27 @@ public class AdminServiceImpl implements AdminService {
 
         // Nếu không tìm kiếm gì thì trả về tất cả
         return userRepository.findAll(pageable);
+    }
+    @Override
+    public List<UserCV> getCandidateCVs(Long userId) {
+        // Kiểm tra xem ứng viên có tồn tại không
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ứng viên với ID: " + userId));
+        
+        // Query toàn bộ CV của ứng viên này trong DB
+        return userCVRepository.findByUserId(userId);
+    }
+
+    @Override
+    public User updateUserStatus(Long userId, boolean isActive) {
+        // Tìm user theo ID
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));
+
+        // Cập nhật trạng thái khóa/mở khóa
+        user.setActive(isActive); 
+
+        // Lưu lại vào DB và trả về
+        return userRepository.save(user);
     }
 }
