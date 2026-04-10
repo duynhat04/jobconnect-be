@@ -3,6 +3,10 @@ package com.jobconnect.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -11,6 +15,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,21 +27,32 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = false)
     private String fullName;
 
-    // Thêm các trường cho trang Profile
     private String phone;
+    private String avatarUrl;
+
+    @Column(nullable = false)
+    private String role = "CANDIDATE"; // "CANDIDATE", "EMPLOYER", "ADMIN"
+
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(50) default 'ACTIVE'")
+    private UserStatus status = UserStatus.ACTIVE;
+
     private String address;
-    private String avatarUrl; // Chứa link ảnh
 
     @Column(columnDefinition = "TEXT")
-    private String bio; // Giới thiệu bản thân
+    private String bio; // Giới thiệu bản thân (Mục Tiêu Nghề Nghiệp)
 
-    // Mặc định ai đăng ký cũng là Ứng viên
-    @Column(nullable = false)
-    private String role = "CANDIDATE";
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt; // Ngày tạo tài khoản
 
-    // Trạng thái tài khoản (true = hoạt động, false = bị khóa)
-    // Mặc định tạo mới là true (hoạt động)
-    private boolean isActive = true; 
+    @UpdateTimestamp
+    private LocalDateTime updatedAt; // Lần cập nhật cuối cùng
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private Company company;
 }

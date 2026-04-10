@@ -167,8 +167,11 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + userId));
 
-        // Cập nhật trạng thái khóa/mở khóa
-        user.setActive(isActive); 
+        if (isActive) {
+            user.setStatus(com.jobconnect.entity.UserStatus.ACTIVE); // Mở khóa
+        } else {
+            user.setStatus(com.jobconnect.entity.UserStatus.BANNED); // Khóa tài khoản
+        }
 
         // Lưu lại vào DB và trả về
         return userRepository.save(user);
