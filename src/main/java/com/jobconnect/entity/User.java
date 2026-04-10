@@ -38,7 +38,7 @@ public class User {
 
     
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "varchar(50) default 'ACTIVE'")
+    @Column(nullable = false, length = 50)
     private UserStatus status = UserStatus.ACTIVE;
 
     private String address;
