@@ -34,44 +34,48 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 // BẬT CORS
                 .cors(Customizer.withDefaults())
-
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        // 1. PUBLIC: Khách vãng lai chưa đăng nhập cũng xem được
+                        // ==========================================
+                        // 1. PUBLIC: Khách vãng lai cũng xem được
+                        // ==========================================
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
-
-                        // BẢO VỆ 2 API RIÊNG TƯ CỦA NHÀ TUYỂN DỤNG
-                        .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/jobs/my-jobs",
-                                "/api/companies/my-company").hasAuthority("EMPLOYER")
-                        // 1.2: Cho phép xem danh sách/chi tiết Job và Công ty
+                        // Cho phép xem danh sách/chi tiết Job và Công ty
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/jobs", "/api/jobs/**",
                                 "/api/companies", "/api/companies/**").permitAll()
+                        // Cho phép mở Swagger API
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // 2. ADMIN: Quyền quản trị hệ thống (Duyệt/Từ chối)
+                        // ==========================================
+                        // 2. ADMIN: Quyền quản trị hệ thống
+                        // ==========================================
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                 "/api/companies/approve/**",
                                 "/api/jobs/approve/**",
                                 "/api/jobs/reject/**").hasAuthority("ADMIN")
 
-                        // 2.1: CHỈ "EMPLOYER" (Nhà tuyển dụng) mới được tạo/sửa Job
+                        // ==========================================
+                        // 3. EMPLOYER: Quyền Nhà tuyển dụng
+                        // ==========================================
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/jobs/my-jobs",
+                                "/api/companies/my-company").hasAuthority("EMPLOYER")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/jobs", "/api/jobs/**").hasAuthority("EMPLOYER")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/jobs/**", "/api/companies/my-profile").hasAuthority("EMPLOYER")
 
-                        // 2.3: CHỈ "CANDIDATE" (Ứng viên) mới được nộp CV
+                        // ==========================================
+                        // 4. CANDIDATE: Quyền Ứng viên
+                        // ==========================================
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/applications/**").hasAuthority("CANDIDATE")
-
                         .requestMatchers("/api/cv/**").hasAuthority("CANDIDATE")
 
-                        // 3. Cho phép mở cửa riêng cho giao diện Swagger API
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-
-                        // 4. Các thao tác khác thì cứ đăng nhập (có Token hợp lệ) là được
-                        // (API /api/notifications/** sẽ rơi vào trường hợp này)
+                        // ==========================================
+                        // 5. CÁC API KHÁC: Bắt buộc phải có Token hợp lệ
+                        // ==========================================
                         .anyRequest().authenticated()
                 );
 
