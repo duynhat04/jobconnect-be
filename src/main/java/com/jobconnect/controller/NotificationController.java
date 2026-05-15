@@ -14,7 +14,7 @@ public class NotificationController {
     private NotificationService notificationService;
 
     private String getCurrentUserEmail() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        return com.jobconnect.config.SecurityUtils.getCurrentUserEmail();
     }
 
     @GetMapping

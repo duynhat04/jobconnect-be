@@ -1,7 +1,5 @@
 package com.jobconnect.config;
 
-import com.jobconnect.entity.User;
-import com.jobconnect.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,56 +23,48 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtils jwtUtils;
 
-    @Autowired
-    private UserRepository userRepository;
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Chặn lại hỏi vé (Lấy Token từ Header của Request)
+        //  Bỏ qua check JWT đối với các request OPTIONS 
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String header = request.getHeader("Authorization");
         String token = null;
         String email = null;
 
-        // Thẻ thật luôn bắt đầu bằng chữ "Bearer " (chuẩn quốc tế)
         if (header != null && header.startsWith("Bearer ")) {
-            token = header.substring(7); // Cắt bỏ chữ "Bearer " để lấy lõi thẻ
+            token = header.substring(7);
             try {
-                email = jwtUtils.getEmailFromToken(token); // Giải mã lấy email
+                email = jwtUtils.getEmailFromToken(token);
             } catch (Exception e) {
                 System.out.println("Lỗi Token hoặc Token đã hết hạn!");
             }
         }
 
-        // 2. Nếu vé chuẩn (có email) và hệ thống chưa ghi nhận người này
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (jwtUtils.validateToken(token)) {
-
-                // Vào DB tìm xem ông này là ai
-                User user = userRepository.findByEmail(email).orElse(null);
-
-                if (user != null) {
-
-                    // --- ĐÂY LÀ PHẦN CODE ĐÃ ĐƯỢC SỬA SANG CÁCH 2 ---
-                    // Lấy Role từ Database và gán vào danh sách Quyền (Authorities)
-                    List<GrantedAuthority> authorities = new ArrayList<>();
-                    if (user.getRole() != null) {
-                        authorities.add(new SimpleGrantedAuthority(user.getRole()));
-                    }
-                    // ------------------------------------------------
-
-                    // Mở barie, cấp quyền cho đi tiếp vào bên trong hệ thống KÈM THEO ROLE
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            user, null, authorities);
-
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+        if (jwtUtils.validateToken(token)) {
+            // LẤY ROLE THẲNG TỪ TOKEN - KHÔNG GỌI DB
+            String role = jwtUtils.getRoleFromToken(token); 
+            
+            List<GrantedAuthority> authorities = new ArrayList<>();
+            if (role != null) {
+                authorities.add(new SimpleGrantedAuthority(role));
             }
-        }
 
-        // 3. Cho phép request đi tiếp
-        filterChain.doFilter(request, response);
+            org.springframework.security.core.userdetails.UserDetails userDetails = 
+                    new org.springframework.security.core.userdetails.User(email, "", authorities);
+
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, authorities);
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+        }
     }
+    filterChain.doFilter(request, response);
+    }   
 }

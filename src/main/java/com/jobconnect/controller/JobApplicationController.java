@@ -106,7 +106,6 @@ public class JobApplicationController {
     public ResponseEntity<?> getAllCandidatesForMyCompany() {
         try {
             String email = getCurrentUserIdentifier();
-            // Lưu ý: Đảm bảo bạn đã thêm hàm getAllApplicationsForMyCompany() vào JobApplicationService như tui hướng dẫn lúc nãy nhé
             return ResponseEntity.ok(applicationService.getAllApplicationsForMyCompany(email));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
@@ -130,7 +129,7 @@ public class JobApplicationController {
         }
     }
 
-    // API 2: Nộp bằng CV đã có sẵn (JSON Body)
+    // API 2: Nộp bằng CV đã có sẵn 
     @PostMapping("/apply-existing")
     public ResponseEntity<?> applyExisting(
             @RequestParam("jobId") Long jobId,

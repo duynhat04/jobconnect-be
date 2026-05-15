@@ -3,6 +3,8 @@ package com.jobconnect.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "companies")
@@ -19,23 +21,29 @@ public class Company {
     private String name;
 
     @Column(unique = true, nullable = false)
-    private String taxCode; // Mã số thuế không được trùng nhau
+    private String taxCode;
 
     private String address;
 
     @Column(columnDefinition = "TEXT")
-    private String description; // Mô tả công ty (Dùng TEXT để lưu được nội dung dài)
+    private String description;
 
-    private String logo; // Lưu link ảnh logo (Cloudinary)
+    private String logo;
 
-    private String website; // Link website công ty
-    // Trạng thái: PENDING (Đang chờ duyệt), APPROVED (Đã duyệt), REJECTED (Từ chối)
+    private String website;
+
+    private String phone;
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
     @Column(nullable = false)
     private String status = "PENDING";
+    private Integer remainingPosts;
 
-    // Liên kết 1-1 với User (Người đại diện đăng ký công ty)
     @OneToOne
     @JoinColumn(name = "user_id")
-    @JsonIgnore // Tránh lỗi lặp vô tận JSON khi test API
+    @JsonIgnore
     private User user;
 }

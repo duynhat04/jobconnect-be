@@ -4,6 +4,11 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Entity
 @Table(name = "user_cvs")
 @Getter
@@ -11,19 +16,26 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserCV {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    private String cvName; // Tên gợi nhớ (VD: CV Backend 2024)
-    private String fileUrl; // Link file đã upload (Cloudinary/S3 hoặc thư mục local)
+    private String cvName;
+    private String fileUrl;
 
     private String cloudinaryPublicId;
-    private boolean isDefault = false; // Đánh dấu CV chính
 
-    private LocalDateTime uploadedAt = LocalDateTime.now();
+    @JsonProperty("isDefault")
+    @Column(name = "is_default")
+    private boolean isDefault = false;
+
+    @CreationTimestamp
+    @Column(name = "uploaded_at")
+    private LocalDateTime uploadedAt;
 }

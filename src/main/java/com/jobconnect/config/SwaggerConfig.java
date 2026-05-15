@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         info = @Info(title = "JobConnect API", version = "1.0", description = "Tài liệu hệ thống API Tuyển dụng"),
-        security = @SecurityRequirement(name = "bearerAuth") // Áp dụng ổ khóa cho tất cả API
+        security = @SecurityRequirement(name = "bearerAuth") 
 )
 @SecurityScheme(
         name = "bearerAuth",
@@ -19,5 +19,4 @@ import org.springframework.context.annotation.Configuration;
         bearerFormat = "JWT"
 )
 public class SwaggerConfig {
-    // Để trống thế này là đủ rồi, Spring Boot sẽ tự hiểu!
 }

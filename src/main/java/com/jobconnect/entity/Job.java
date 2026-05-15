@@ -19,7 +19,11 @@ public class Job {
     private String title;
 
     private String location;
+    
     private Long salary;
+
+    @Column(name = "category")
+    private String category;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -30,12 +34,11 @@ public class Job {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(nullable = false)
-    private String status = "PENDING"; // Trạng thái mặc định khi vừa tạo là PENDING
+    private String status = "PENDING"; 
 
     @Column(columnDefinition = "TEXT")
-    private String rejectionReason; // Lưu lý do nếu Admin từ chối
+    private String rejectionReason; 
 
-    // Liên kết Nhiều-1 với Company (Nhiều Job thuộc về 1 Company)
     @ManyToOne
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;

@@ -1,14 +1,17 @@
 package com.jobconnect.dto;
 
-import com.jobconnect.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-@AllArgsConstructor // Tự tạo Constructor có tham số
+@AllArgsConstructor 
 public class JwtResponse {
     private String token;
-    private User user;
+    private String refreshToken;
+    private Long id;
+    private String email;
+    private String fullName;
+    private String role;
 }

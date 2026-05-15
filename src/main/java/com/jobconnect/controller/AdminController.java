@@ -1,6 +1,8 @@
 package com.jobconnect.controller;
 
+import com.jobconnect.dto.CompanyAdminDTO;
 import com.jobconnect.dto.DashboardStatsDTO;
+import com.jobconnect.dto.RevenueStatsDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.User;
@@ -12,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
 public class AdminController {
 
@@ -26,17 +27,18 @@ public class AdminController {
 
     // LẤY DANH SÁCH CÔNG TY (PHÂN TRANG)
     @GetMapping("/companies")
-    public ResponseEntity<Page<Company>> getAllCompanies(
+    public ResponseEntity<Page<CompanyAdminDTO>> getAllCompanies(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
 
-        Page<Company> companies = adminService.getAllCompanies(page, size, status, search);
+        Page<CompanyAdminDTO> companies = adminService.getAllCompanies(page, size, status, search);
+
         return ResponseEntity.ok(companies);
     }
 
-    //  DUYỆT / TỪ CHỐI CÔNG TY
+    // DUYỆT / TỪ CHỐI CÔNG TY
     @PutMapping("/companies/{id}/status")
     public ResponseEntity<Company> updateCompanyStatus(
             @PathVariable Long id,
@@ -45,6 +47,7 @@ public class AdminController {
         Company updatedCompany = adminService.updateCompanyStatus(id, status);
         return ResponseEntity.ok(updatedCompany);
     }
+
     // Lấy danh sách
     @GetMapping("/jobs")
     public ResponseEntity<Page<Job>> getAllJobs(
@@ -65,21 +68,13 @@ public class AdminController {
         return ResponseEntity.ok(adminService.updateJobStatus(id, status));
     }
 
-    // Lấy danh sách User
-    @GetMapping("/users")
-    public ResponseEntity<Page<User>> getAllUsers(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String search) {
-
-        return ResponseEntity.ok(adminService.getAllUsers(page, size, search));
-    }
-
-    // LẤY DANH SÁCH CV CỦA 1 ỨNG VIÊN CỤ THỂ (Để Admin click vào user thì hiện ra CV)
+    // LẤY DANH SÁCH CV CỦA 1 ỨNG VIÊN CỤ THỂ (Để Admin click vào user thì hiện ra
+    // CV)
     @GetMapping("/users/{id}/cvs")
     public ResponseEntity<?> getCandidateCVs(@PathVariable Long id) {
-        // Mày có thể gọi thẳng UserCVService ở đây, hoặc viết thêm hàm getCandidateCVs trong AdminService
-        return ResponseEntity.ok(adminService.getCandidateCVs(id)); 
+        // Mày có thể gọi thẳng UserCVService ở đây, hoặc viết thêm hàm getCandidateCVs
+        // trong AdminService
+        return ResponseEntity.ok(adminService.getCandidateCVs(id));
     }
 
     // KHÓA / MỞ KHÓA TÀI KHOẢN ỨNG VIÊN
@@ -88,5 +83,48 @@ public class AdminController {
             @PathVariable Long id,
             @RequestParam boolean isActive) { // Hoặc dùng String status tùy design DB của m
         return ResponseEntity.ok(adminService.updateUserStatus(id, isActive));
+    }
+
+    // LẤY CHI TIẾT 1 JOB
+    @GetMapping("/jobs/{id}")
+    public ResponseEntity<Job> getJobById(@PathVariable Long id) {
+        Job job = adminService.getJobById(id);
+        return ResponseEntity.ok(job);
+    }
+
+    // LẤY CHI TIẾT 1 CÔNG TY
+    @GetMapping("/companies/{id}")
+    public ResponseEntity<Company> getCompanyById(@PathVariable Long id) {
+        Company company = adminService.getCompanyById(id);
+        return ResponseEntity.ok(company);
+    }
+
+    // LẤY CHI TIẾT 1 ỨNG VIÊN (USER)
+    @GetMapping("/users/{id}")
+    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+        // Giả sử sếp đã viết hàm getUserById trong AdminService.
+        // Nếu chưa có thì sếp sang AdminService viết thêm hàm findById nhé!
+        User user = adminService.getUserById(id);
+        return ResponseEntity.ok(user);
+    }
+
+    // Lấy danh sách User
+    @GetMapping("/users")
+    public ResponseEntity<Page<User>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
+
+        return ResponseEntity.ok(adminService.getAllUsers(page, size, status, search));
+    }
+
+    // LẤY BÁO CÁO & THỐNG KÊ DOANH THU
+    @GetMapping("/revenue-stats")
+    public ResponseEntity<RevenueStatsDTO> getRevenueStats(
+            @RequestParam(required = false, defaultValue = "6months") String range) {
+
+        RevenueStatsDTO stats = adminService.getRevenueStats(range);
+        return ResponseEntity.ok(stats);
     }
 }

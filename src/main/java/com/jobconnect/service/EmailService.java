@@ -1,26 +1,37 @@
 package com.jobconnect.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class EmailService {
 
-    @Autowired
-    private JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
 
-    public void sendEmail(String toEmail, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
+    public void sendEmail(String to, String subject,String content) {
+        try {
+            SimpleMailMessage message =new SimpleMailMessage();
 
-        // Cấu hình nội dung thư
-        message.setFrom("JobConnect System <dia_chi_email_cua_ban@gmail.com>"); // Thay email của bạn vào đây
-        message.setTo(toEmail);
-        message.setSubject(subject);
-        message.setText(body);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(content);
 
-        // Bấm nút gửi!
-        mailSender.send(message);
+            mailSender.send(message);
+
+            log.info("Email sent successfully to: {}", to );
+        } catch (MailException e) {
+
+            log.error("Failed to send email to: {}", to, e );
+
+            throw new RuntimeException(
+                    "Không thể gửi email"
+            );
+        }
     }
 }

@@ -2,118 +2,137 @@ package com.jobconnect.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.jobconnect.dto.UserCVResponse;
 import com.jobconnect.entity.User;
 import com.jobconnect.entity.UserCV;
 import com.jobconnect.repository.UserCVRepository;
 import com.jobconnect.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor // Chuẩn Deploy: Khuyên dùng thay cho @Autowired trên từng field
 public class UserCVService {
 
-    @Autowired
-    private UserCVRepository userCVRepository;
+    private final UserCVRepository userCVRepository;
+    private final UserRepository userRepository;
+    private final Cloudinary cloudinary;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private Cloudinary cloudinary;
-
-    public List<UserCV> getMyCVs(String email) {
+    public List<UserCVResponse> getMyCVs(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
-        return userCVRepository.findByUserId(user.getId());
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        return userCVRepository.findByUserId(user.getId())
+                .stream()
+                .map(cv -> new UserCVResponse(
+                        cv.getId(),
+                        cv.getCvName(),
+                        cv.getFileUrl(),
+                        cv.isDefault(),
+                        cv.getUploadedAt()
+                ))
+                .collect(Collectors.toList());
     }
 
-    public UserCV uploadCV(String email, MultipartFile file, String cvName) throws Exception {
-        // 1. Validation (Kiểm tra file)
-        if (file.isEmpty()) {
-            throw new RuntimeException("File không được để trống!");
-        }
-        
-        // Check size: Max 5MB (5 * 1024 * 1024 bytes)
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new RuntimeException("Kích thước file không được vượt quá 5MB!");
-        }
-
-        // Check type: Chỉ cho PDF hoặc Word
-        String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("application/pdf") && 
-            !contentType.equals("application/msword") && 
-            !contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))) {
-            throw new RuntimeException("Chỉ chấp nhận định dạng PDF hoặc Word (.doc, .docx)!");
-        }
+    @Transactional(rollbackFor = Exception.class) // Rollback DB nếu bất kỳ lỗi nào xảy ra
+    public UserCV uploadCV(String email, MultipartFile file, String cvName) {
+        // 1. Validate file chặt chẽ hơn
+        if (file == null || file.isEmpty()) throw new RuntimeException("File không được để trống!");
+        if (file.getSize() > 5 * 1024 * 1024) throw new RuntimeException("File tối đa 5MB!");
+        if (!"application/pdf".equalsIgnoreCase(file.getContentType())) throw new RuntimeException("Chỉ chấp nhận file PDF!");
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại!"));
 
-        // 2. Upload lên Cloudinary
-        Map<String, Object> uploadOptions = new java.util.HashMap<>();
-        uploadOptions.put("resource_type", "auto"); 
+        try {
+            // 2. FIX LỖI CLOUDINARY: Chuyển MultipartFile sang byte[] thay vì dùng InputStream
+            byte[] fileBytes = file.getBytes();
 
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), uploadOptions);
-        String fileUrl = uploadResult.get("secure_url").toString();
-        // Lấy public_id để lưu vào DB
-        String publicId = uploadResult.get("public_id").toString(); 
+            // 3. Cấu hình Upload Cloudinary
+            Map<String, Object> options = ObjectUtils.asMap(
+                    "resource_type", "raw", // Bắt buộc là "raw" đối với file PDF/Docx
+                    "folder", "jobconnect/cv",
+                    "public_id", "cv_" + user.getId() + "_" + System.currentTimeMillis()+ ".pdf"
+            );
 
-        // 3. Lưu vào Database
-        UserCV newCV = new UserCV();
-        newCV.setUser(user);
-        newCV.setCvName(cvName);
-        newCV.setFileUrl(fileUrl);
-        newCV.setCloudinaryPublicId(publicId); // Lưu ID vào đây
+            // Thực hiện đẩy file lên
+            Map result = cloudinary.uploader().upload(fileBytes, options);
+            
+            String fileUrl = result.get("secure_url").toString();
+            String publicId = result.get("public_id").toString();
 
-        if (userCVRepository.findByUserId(user.getId()).isEmpty()) {
-            newCV.setDefault(true);
+            // 4. Lưu Database
+            UserCV newCV = new UserCV();
+            newCV.setUser(user);
+            newCV.setCvName(cvName);
+            newCV.setFileUrl(fileUrl);
+            newCV.setCloudinaryPublicId(publicId);
+
+            // Nếu user chưa có CV nào trong DB, mặc định CV đầu tiên là Default
+            boolean isFirstCV = userCVRepository.findByUserId(user.getId()).isEmpty();
+            newCV.setDefault(isFirstCV);
+
+            return userCVRepository.save(newCV);
+
+        } catch (IOException e) {
+            log.error("❌ Cloudinary upload error for user {}: ", email, e);
+            throw new RuntimeException("Lỗi máy chủ trong quá trình tải file lên hệ thống!");
         }
-
-        return userCVRepository.save(newCV);
     }
 
-    public void deleteCV(Long id, String email) throws Exception {
+    @Transactional
+    public void deleteCV(Long id, String email) {
         UserCV cv = userCVRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy CV"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy CV yêu cầu!"));
 
         if (!cv.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Lỗi bảo mật: Bạn không có quyền xóa CV này!");
+            throw new RuntimeException("Bạn không có quyền xóa CV này!");
         }
 
-        // Xóa file trên Cloudinary trước cho sạch server
-        if (cv.getCloudinaryPublicId() != null) {
-            cloudinary.uploader().destroy(cv.getCloudinaryPublicId(), ObjectUtils.emptyMap());
+        // Xóa file vật lý trên Cloudinary trước
+        if (cv.getCloudinaryPublicId() != null && !cv.getCloudinaryPublicId().trim().isEmpty()) {
+            try {
+                cloudinary.uploader().destroy(cv.getCloudinaryPublicId(), ObjectUtils.asMap("resource_type", "raw"));
+            } catch (IOException e) {
+                log.warn("⚠️ Không thể xóa file trên Cloudinary (public_id: {}), nhưng vẫn tiến hành xóa trong DB.", cv.getCloudinaryPublicId(), e);
+                // Cố tình không throw Exception ở đây.
+                // Nếu Cloudinary lỗi mạng, ta vẫn muốn xóa dữ liệu rác trong Database.
+            }
         }
 
-        // Xóa trong DB
-        userCVRepository.deleteById(id);
+        // Xóa dữ liệu trong DB
+        userCVRepository.delete(cv);
     }
 
-    // Hàm Set CV mặc định
+    @Transactional
     public void setDefaultCV(Long cvId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
         UserCV targetCV = userCVRepository.findById(cvId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy CV"));
+                .orElseThrow(() -> new RuntimeException("CV không tồn tại!"));
 
         if (!targetCV.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Lỗi bảo mật: Bạn không có quyền thao tác trên CV này!");
+            throw new RuntimeException("Bạn không sở hữu CV này!");
         }
 
-        // Lấy tất cả CV của user này, set isDefault = false hết
+        // Tối ưu thuật toán set Default: Chỉ 1 vòng lặp duy nhất
         List<UserCV> userCvs = userCVRepository.findByUserId(user.getId());
-        for (UserCV cv : userCvs) {
-            cv.setDefault(false);
-        }
-        userCVRepository.saveAll(userCvs);
+        userCvs.forEach(cv -> {
+            // Nếu CV đang duyệt trùng ID với CV mục tiêu -> set true, còn lại false
+            cv.setDefault(cv.getId().equals(targetCV.getId()));
+        });
 
-        // Bật isDefault = true cho cái CV được chọn
-        targetCV.setDefault(true);
-        userCVRepository.save(targetCV);
+        // Save 1 lần toàn bộ List thay vì save từng cái
+        userCVRepository.saveAll(userCvs);
     }
 }

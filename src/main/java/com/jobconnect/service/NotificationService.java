@@ -21,29 +21,28 @@ public class NotificationService {
     public List<Notification> getMyNotifications(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        // Lấy 30 cái mới nhất thay vì lấy tất cả
+        return notificationRepository.findTop30ByUserIdOrderByCreatedAtDesc(user.getId());
     }
 
     public Notification markAsRead(Long id) {
         Notification notif = notificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo"));
-        notif.setRead(true);
+        notif.setIsRead(true);
         return notificationRepository.save(notif);
     }
 
-    // THÊM HÀM TẠO THÔNG BÁO MỚI
-    public Notification createNotification(Long userId, String title, String message, String type, String targetUrl) {
+     public Notification createNotification(Long userId, String title, String message, String type, String targetUrl) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
-
         Notification notif = new Notification();
         notif.setUser(user);
         notif.setTitle(title);
         notif.setMessage(message);
         notif.setType(type);
         notif.setTargetUrl(targetUrl);
-
         return notificationRepository.save(notif);
+
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -51,15 +50,7 @@ public class NotificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
-        // Lấy hết thông báo CHƯA ĐỌC của user này ra
-        List<Notification> unreadNotifs = notificationRepository.findByUserIdAndIsReadFalse(user.getId());
-
-        // Set thành đã đọc hết
-        for (Notification notif : unreadNotifs) {
-            notif.setRead(true);
-        }
-
-        // Lưu lại 1 loạt vào DB
-        notificationRepository.saveAll(unreadNotifs);
+        // CHUẨN DEPLOY: Update thẳng bằng 1 câu Query duy nhất, cực nhẹ!
+        notificationRepository.markAllAsReadByUserId(user.getId());
     }
 }

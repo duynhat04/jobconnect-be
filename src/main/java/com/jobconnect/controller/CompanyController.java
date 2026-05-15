@@ -1,12 +1,12 @@
 package com.jobconnect.controller;
 
+import com.jobconnect.dto.CompanyStatsDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.service.CompanyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/companies")
@@ -28,34 +28,18 @@ public class CompanyController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-    // // API để Admin duyệt công ty
-    // @PutMapping("/approve/{companyId}")
-    // public ResponseEntity<?> approveCompany(@PathVariable Long companyId) {
-    //     try {
-    //         Company approvedCompany = companyService.approveCompany(companyId);
-    //         return ResponseEntity.ok(approvedCompany);
-    //     } catch (RuntimeException e) {
-    //         return ResponseEntity.badRequest().body(e.getMessage());
-    //     }
-    // }
-
+    
     // Thêm hàm phụ trợ lấy Email tương tự như bên JobController
-    private String getCurrentUserIdentifier() {
-        Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof com.jobconnect.entity.User) {
-            return ((com.jobconnect.entity.User) principal).getEmail();
-        } else if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
-            return ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
-        }
-        return principal.toString();
+    private String getCurrentUserEmail() {
+        return org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication().getName(); 
     }
 
     // API Lấy thông tin Công ty của Nhà tuyển dụng đang đăng nhập
     @GetMapping("/my-company")
     public ResponseEntity<?> getMyCompany() {
         try {
-            String email = getCurrentUserIdentifier();
-            return ResponseEntity.ok(companyService.getMyCompany(email));
+            return ResponseEntity.ok(companyService.getMyCompany(getCurrentUserEmail()));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -64,19 +48,19 @@ public class CompanyController {
     @GetMapping("/my-stats")
     public ResponseEntity<?> getDashboardStats() {
         try {
-            String email = getCurrentUserIdentifier();
-            Map<String, Object> stats = companyService.getCompanyStats(email);
+            String email = getCurrentUserEmail();
+            // FIX: Trả về DTO trực tiếp, không dùng Map nữa
+            CompanyStatsDTO stats = companyService.getCompanyStats(email);
             return ResponseEntity.ok(stats);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
     // API Cập nhật thông tin Công ty
-    @PutMapping("/my-profile")
+   @PutMapping("/my-profile")
     public ResponseEntity<?> updateMyProfile(@RequestBody Company updatedData) {
         try {
-            String email = getCurrentUserIdentifier();
-            Company savedCompany = companyService.updateMyCompany(email, updatedData);
+            Company savedCompany = companyService.updateMyCompany(getCurrentUserEmail(), updatedData);
             return ResponseEntity.ok(savedCompany);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

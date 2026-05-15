@@ -1,5 +1,6 @@
 package com.jobconnect.service;
 
+import com.jobconnect.dto.CompanyStatsDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.User;
 import com.jobconnect.repository.CompanyRepository;
@@ -9,8 +10,6 @@ import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class CompanyService {
@@ -32,7 +31,8 @@ public class CompanyService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy người dùng với ID " + userId));
 
-        // Chốt chặn 2: Chống Spam. Mỗi User chỉ được tạo 1 Công ty (Dù PENDING hay APPROVED)
+        // Chốt chặn 2: Chống Spam. Mỗi User chỉ được tạo 1 Công ty (Dù PENDING hay
+        // APPROVED)
         if (companyRepository.existsByUserId(userId)) {
             throw new RuntimeException("Lỗi: Người dùng này đã có công ty hoặc đang chờ duyệt!");
         }
@@ -46,8 +46,14 @@ public class CompanyService {
         company.setUser(user);
         company.setStatus("PENDING");
 
+        // FREE PLAN mặc định
+        if (company.getRemainingPosts() == null) {
+            company.setRemainingPosts(5);
+        }
+
         return companyRepository.save(company);
     }
+
     // API dành cho Admin: Duyệt công ty
     public Company approveCompany(Long companyId) {
         // 1. Tìm công ty theo ID
@@ -62,7 +68,8 @@ public class CompanyService {
         // 3. Đổi trạng thái Công ty thành APPROVED
         company.setStatus("APPROVED");
 
-        // 4. Lấy User là chủ của công ty này và nâng cấp lên làm Nhà tuyển dụng (EMPLOYER)
+        // 4. Lấy User là chủ của công ty này và nâng cấp lên làm Nhà tuyển dụng
+        // (EMPLOYER)
         User user = company.getUser();
         if (user != null) {
             user.setRole("EMPLOYER");
@@ -75,44 +82,52 @@ public class CompanyService {
 
     public Company getMyCompany(String email) {
         return companyRepository.findByUser_Email(email)
-                .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký thông tin công ty hoặc tài khoản không tồn tại!"));
+                .orElseThrow(
+                        () -> new RuntimeException("Bạn chưa đăng ký thông tin công ty hoặc tài khoản không tồn tại!"));
     }
 
-    public Map<String, Object> getCompanyStats(String email) {
-        // 1. Tìm công ty của người đang đăng nhập
+    public CompanyStatsDTO getCompanyStats(String email) {
         Company company = companyRepository.findByUser_Email(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty của bạn!"));
 
         Long companyId = company.getId();
 
-        // 2. Gọi các hàm COUNT từ Repository
+        // Count thật từ Database
         long activeJobs = jobRepository.countActiveJobsByCompanyId(companyId);
         long totalCVs = jobApplicationRepository.countTotalCVsByCompanyId(companyId);
+        long pending = jobApplicationRepository.countPendingCVsByCompanyId(companyId);
+        long approved = jobApplicationRepository.countApprovedCVsByCompanyId(companyId);
+        long pendingJobs = jobRepository.countByCompanyIdAndStatus(companyId, "PENDING");
 
-        // 3. Fake data tạm cho 2 thông số chưa có bảng (Sau này có bảng Views thì sửa sau)
-        long profileViews = 120 + (companyId * 5); // Tạo số ngẫu nhiên cho đẹp
-        String responseRate = "85%";
-
-        // 4. Đóng gói vào Map rồi trả về
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("activeJobs", activeJobs);
-        stats.put("totalCVs", totalCVs);
-        stats.put("profileViews", profileViews);
-        stats.put("responseRate", responseRate);
-
-        return stats;
+        return CompanyStatsDTO.builder()
+                .activeJobs(activeJobs)
+                .totalCVs(totalCVs)
+                .pendingCVs(pending)
+                .approvedCVs(approved)
+                .pendingJobs(pendingJobs)
+                .remainingPosts(company.getRemainingPosts() != null ? company.getRemainingPosts() : 0)
+                .profileViews(125L) // Sau này sếp làm bảng Tracking thì thay vào đây
+                .responseRate("88%")
+                .build();
     }
+
     // API Cập nhật thông tin công ty
     public Company updateMyCompany(String email, Company updatedData) {
         Company existingCompany = companyRepository.findByUser_Email(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty của bạn!"));
 
-        // Cập nhật các trường cho phép (Không cho phép đổi Mã số thuế, Trạng thái duyệt)
-        if (updatedData.getName() != null) existingCompany.setName(updatedData.getName());
-        if (updatedData.getAddress() != null) existingCompany.setAddress(updatedData.getAddress());
-        if (updatedData.getDescription() != null) existingCompany.setDescription(updatedData.getDescription());
-        if (updatedData.getLogo() != null) existingCompany.setLogo(updatedData.getLogo());
-        if (updatedData.getWebsite() != null) existingCompany.setWebsite(updatedData.getWebsite());
+        // Cập nhật các trường cho phép (Không cho phép đổi Mã số thuế, Trạng thái
+        // duyệt)
+        if (updatedData.getName() != null)
+            existingCompany.setName(updatedData.getName());
+        if (updatedData.getAddress() != null)
+            existingCompany.setAddress(updatedData.getAddress());
+        if (updatedData.getDescription() != null)
+            existingCompany.setDescription(updatedData.getDescription());
+        if (updatedData.getLogo() != null)
+            existingCompany.setLogo(updatedData.getLogo());
+        if (updatedData.getWebsite() != null)
+            existingCompany.setWebsite(updatedData.getWebsite());
 
         return companyRepository.save(existingCompany);
     }

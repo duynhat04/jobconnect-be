@@ -1,6 +1,7 @@
 package com.jobconnect.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.jobconnect.entity.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -24,7 +25,7 @@ public class User {
     private String email;
 
     @JsonIgnore
-    @Column(nullable = false)
+    @Column
     private String password;
 
     @Column(nullable = false)
@@ -36,7 +37,18 @@ public class User {
     @Column(nullable = false)
     private String role = "CANDIDATE"; // "CANDIDATE", "EMPLOYER", "ADMIN"
 
-    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(length = 10)
+    private String otpCode;
+
+    private LocalDateTime otpExpiredAt;
+
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private UserStatus status = UserStatus.ACTIVE;
@@ -44,15 +56,21 @@ public class User {
     private String address;
 
     @Column(columnDefinition = "TEXT")
-    private String bio; // Giới thiệu bản thân (Mục Tiêu Nghề Nghiệp)
+    private String bio;
 
     @CreationTimestamp
     @Column(updatable = false)
-    private LocalDateTime createdAt; // Ngày tạo tài khoản
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    private LocalDateTime updatedAt; // Lần cập nhật cuối cùng
+    private LocalDateTime updatedAt;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private Company company;
+
+    @Column(columnDefinition = "TEXT")
+    private String skills;
+
+    @Column(name = "cv_url")
+    private String cvUrl;
 }

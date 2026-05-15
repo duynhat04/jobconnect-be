@@ -16,18 +16,37 @@ public class JwtUtils {
     @Value("${jwt.expiration}")
     private int jwtExpirationMs;
 
+    // cấu hình thời gian sống cho Refresh Token (7 ngày)
+    private final long refreshTokenExpirationMs = 7 * 24 * 60 * 60 * 1000;
+
     // Tạo chìa khóa từ chuỗi bí mật (Secret Key)
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    // 3. Hàm tạo Token
-    public String generateToken(String email) {
+    // Hàm tạo Token
+    public String generateToken(String email, String role) {
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("role", role)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String getRoleFromToken(String token) {
+        return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                .parseClaimsJws(token).getBody().get("role", String.class);
+    }
+
+    // Hàm tạo Refresh Token
+    public String generateRefreshToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(getSigningKey()) // Luôn dùng chìa khóa từ file cấu hình
+                .setExpiration(new Date((new Date()).getTime() + refreshTokenExpirationMs))
+                .signWith(getSigningKey())
                 .compact();
     }
 

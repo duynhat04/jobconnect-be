@@ -5,6 +5,7 @@ import com.jobconnect.entity.JobApplication;
 import com.jobconnect.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,4 +26,14 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     // Lấy danh sách tất cả ứng viên nộp vào công ty của nhà tuyển dụng (Sắp xếp mới nhất lên đầu)
     List<JobApplication> findByJob_Company_User_EmailOrderByIdDesc(String email);
+
+    // Đếm số CV đang chờ duyệt (PENDING)
+    @Query("SELECT COUNT(ja) FROM JobApplication ja WHERE ja.job.company.id = :companyId AND ja.status = 'PENDING'")
+    long countPendingCVsByCompanyId(@Param("companyId") Long companyId);
+
+    // Đếm số CV đã duyệt/chấp nhận (APPROVED)
+    @Query("SELECT COUNT(ja) FROM JobApplication ja WHERE ja.job.company.id = :companyId AND ja.status = 'APPROVED'")
+    long countApprovedCVsByCompanyId(@Param("companyId") Long companyId);
+
+    
 }
