@@ -10,9 +10,15 @@ import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 
 import java.time.LocalDateTime;
 import java.util.Random;
+import java.util.Collections;
 
 @Service
 public class UserService {
@@ -28,6 +34,9 @@ public class UserService {
 
     @Autowired
     private EmailService emailService;
+
+    @Value("${google.client.id}")
+    private String googleClientId;
 
     public User registerUser(RegisterRequest request) {
 
@@ -91,21 +100,23 @@ public class UserService {
     public JwtResponse loginUser(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Lỗi: Email không tồn tại!"));
-        if (!user.isEmailVerified()) {
 
+        if (user.getProvider() == AuthProvider.GOOGLE && user.getPassword() == null) {
             throw new RuntimeException(
-                    "Tài khoản chưa xác thực email!");
+                    "Tài khoản này được đăng nhập bằng Google. Vui lòng dùng nút Đăng nhập với Google!");
         }
+
+        if (!user.isEmailVerified()) {
+            throw new RuntimeException("Tài khoản chưa xác thực email!");
+        }
+
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new RuntimeException("Lỗi: Sai mật khẩu!");
         }
 
-        // Tạo token (Nhớ update JwtUtils để nhận thêm Role nếu sếp làm theo cách tớ bảo
-        // ở trên)
         String token = jwtUtils.generateToken(user.getEmail(), user.getRole());
         String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
 
-        // Trả về DTO sạch sẽ
         return new JwtResponse(
                 token,
                 refreshToken,
@@ -222,5 +233,77 @@ public class UserService {
                 user.getBio(),
                 user.getSkills(),
                 user.getCvUrl());
+    }
+
+    public JwtResponse loginWithGoogle(String credential) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    GsonFactory.getDefaultInstance())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(credential);
+
+            if (idToken == null) {
+                throw new RuntimeException("Google token không hợp lệ!");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+
+            String email = payload.getEmail();
+            String fullName = (String) payload.get("name");
+            String avatarUrl = (String) payload.get("picture");
+            Boolean emailVerified = payload.getEmailVerified();
+
+            if (email == null || email.isBlank()) {
+                throw new RuntimeException("Không lấy được email từ Google!");
+            }
+
+            if (emailVerified == null || !emailVerified) {
+                throw new RuntimeException("Email Google chưa được xác thực!");
+            }
+
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            if (user == null) {
+                user = new User();
+                user.setEmail(email);
+                user.setFullName(fullName != null ? fullName : email);
+                user.setAvatarUrl(avatarUrl);
+                user.setRole("CANDIDATE");
+                user.setProvider(AuthProvider.GOOGLE);
+                user.setEmailVerified(true);
+                user.setPassword(null);
+
+                user = userRepository.save(user);
+            } else {
+                if (user.getProvider() == AuthProvider.LOCAL) {
+                    user.setProvider(AuthProvider.GOOGLE);
+                }
+
+                user.setEmailVerified(true);
+
+                if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
+                    user.setAvatarUrl(avatarUrl);
+                }
+
+                userRepository.save(user);
+            }
+
+            String token = jwtUtils.generateToken(user.getEmail(), user.getRole());
+            String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
+
+            return new JwtResponse(
+                    token,
+                    refreshToken,
+                    user.getId(),
+                    user.getEmail(),
+                    user.getFullName(),
+                    user.getRole());
+
+        } catch (Exception e) {
+            throw new RuntimeException("Đăng nhập Google thất bại: " + e.getMessage());
+        }
     }
 }

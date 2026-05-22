@@ -9,6 +9,7 @@ import com.jobconnect.dto.JwtResponse;
 import com.jobconnect.dto.VerifyOtpRequest;
 import com.jobconnect.dto.ResendOtpRequest;
 import com.jobconnect.dto.LoginRequest;
+import com.jobconnect.dto.GoogleLoginRequest;
 import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +57,16 @@ public class UserController {
             // Vì UserService.loginUser của sếp đã trả về JwtResponse rồi
             // nên ở đây gọi trực tiếp luôn cho gọn sạch
             JwtResponse response = userService.loginUser(loginRequest.getEmail(), loginRequest.getPassword());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/google-login")
+    public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
+        try {
+            JwtResponse response = userService.loginWithGoogle(request.getCredential());
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

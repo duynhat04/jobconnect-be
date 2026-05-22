@@ -60,8 +60,10 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                                                                 "/api/users/register",
                                                                 "/api/users/login",
+                                                                "/api/users/google-login",
                                                                 "/api/users/verify-otp",
-                                                                "/api/users/resend-otp")
+                                                                "/api/users/resend-otp",
+                                                                "/api/ai/**")
                                                 .permitAll()
                                                 // Cho phép mở Swagger API
                                                 .requestMatchers("/v3/api-docs/**",
@@ -119,7 +121,7 @@ public class SecurityConfig {
 
                 configuration.setAllowedOrigins(Arrays.asList(
                                 "http://localhost:3000", 
-                                "jobconnect-fe-nextjs.vercel.app" 
+                                "https://jobconnect-fe-nextjs.vercel.app" 
                 ));
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("*"));
