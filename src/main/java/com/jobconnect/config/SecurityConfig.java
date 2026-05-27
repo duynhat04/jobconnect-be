@@ -32,29 +32,27 @@ public class SecurityConfig {
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
                 http
                                 .csrf(csrf -> csrf.disable())
-                                // BẬT CORS
                                 .cors(Customizer.withDefaults())
                                 .httpBasic(basic -> basic.disable())
                                 .formLogin(form -> form.disable())
 
                                 .authorizeHttpRequests(auth -> auth
 
+                                                // ==========================================
+                                                // 0. OPTIONS: Cho phép preflight CORS
+                                                // ==========================================
                                                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
                                                 .permitAll()
-                                                // ==========================================
-                                                // 1. PUBLIC: Khách vãng lai cũng xem được
-                                                // ==========================================
-                                                .requestMatchers("/api/settings",
-                                                                "/error")
-                                                .permitAll()
 
-                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                                                "/api/jobs",
-                                                                "/api/jobs/**",
-                                                                "/api/companies", "/api/companies/**",
-                                                                "/api/v1/packages/active",
-                                                                "/api/users/verify-otp",
-                                                                "/api/dev/**")
+                                                // ==========================================
+                                                // 1. PUBLIC: API công khai
+                                                // ==========================================
+                                                .requestMatchers(
+                                                                "/api/settings",
+                                                                "/error",
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-ui/**",
+                                                                "/swagger-ui.html")
                                                 .permitAll()
 
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
@@ -62,20 +60,17 @@ public class SecurityConfig {
                                                                 "/api/users/login",
                                                                 "/api/users/google-login",
                                                                 "/api/users/verify-otp",
-                                                                "/api/users/resend-otp",
-                                                                "/api/ai/**")
-                                                .permitAll()
-                                                // Cho phép mở Swagger API
-                                                .requestMatchers("/v3/api-docs/**",
-                                                                "/swagger-ui/**",
-                                                                "/swagger-ui.html")
+                                                                "/api/users/resend-otp")
                                                 .permitAll()
 
                                                 // ==========================================
                                                 // 2. ADMIN: Quyền quản trị hệ thống
                                                 // ==========================================
-                                                .requestMatchers("/api/admin/**", "/api/v1/packages/**")
+                                                .requestMatchers(
+                                                                "/api/admin/**",
+                                                                "/api/v1/packages/**")
                                                 .hasAuthority("ADMIN")
+
                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                                                 "/api/companies/approve/**",
                                                                 "/api/jobs/approve/**",
@@ -84,28 +79,76 @@ public class SecurityConfig {
 
                                                 // ==========================================
                                                 // 3. EMPLOYER: Quyền Nhà tuyển dụng
+                                                // Đặt trước public GET /api/jobs/*
                                                 // ==========================================
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/jobs/my-jobs",
-                                                                "/api/companies/my-company")
-                                                .hasAuthority("EMPLOYER")
-                                                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/jobs",
+                                                                "/api/companies/my-company",
+                                                                "/api/applications/job/*",
+                                                                "/api/applications/job/*/candidates",
+                                                                "/api/applications/employer/all")
+                                                .hasAnyAuthority("EMPLOYER", "ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/jobs",
                                                                 "/api/jobs/**")
                                                 .hasAuthority("EMPLOYER")
+
                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
-                                                                "/api/jobs/**", "/api/companies/my-profile")
-                                                .hasAuthority("EMPLOYER")
+                                                                "/api/jobs/**",
+                                                                "/api/companies/my-profile",
+                                                                "/api/applications/*/status")
+                                                .hasAnyAuthority("EMPLOYER", "ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.DELETE,
+                                                                "/api/jobs/**")
+                                                .hasAnyAuthority("EMPLOYER", "ADMIN")
 
                                                 // ==========================================
                                                 // 4. CANDIDATE: Quyền Ứng viên
                                                 // ==========================================
-                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                                                "/api/applications/**")
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/applications/my-applications")
                                                 .hasAuthority("CANDIDATE")
-                                                .requestMatchers("/api/cv/**").hasAuthority("CANDIDATE")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/applications/apply",
+                                                                "/api/applications/apply-new",
+                                                                "/api/applications/apply-existing")
+                                                .hasAuthority("CANDIDATE")
+
+                                                .requestMatchers("/api/cv/**")
+                                                .hasAuthority("CANDIDATE")
 
                                                 // ==========================================
-                                                // 5. CÁC API KHÁC: Bắt buộc phải có Token hợp lệ
+                                                // 5. USER ĐÃ ĐĂNG NHẬP: Profile, đổi mật khẩu, thông báo, AI
+                                                // ==========================================
+                                                .requestMatchers(
+                                                                "/api/users/profile",
+                                                                "/api/users/change-password",
+                                                                "/api/users/refresh-token",
+                                                                "/api/notifications/**")
+                                                .authenticated()
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/ai/**")
+                                                .authenticated()
+
+                                                // ==========================================
+                                                // 6. PUBLIC GET: Khách vãng lai xem được
+                                                // Đặt sau các API protected để tránh public nhầm
+                                                // ==========================================
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/jobs",
+                                                                "/api/jobs/*",
+                                                                "/api/companies",
+                                                                "/api/companies/*",
+                                                                "/api/v1/packages/active",
+                                                                "/api/dev/**")
+                                                .permitAll()
+
+                                                // ==========================================
+                                                // 7. CÁC API KHÁC: Bắt buộc có token hợp lệ
                                                 // ==========================================
                                                 .anyRequest().authenticated());
 
@@ -114,21 +157,29 @@ public class SecurityConfig {
                 return http.build();
         }
 
-        // CẤU HÌNH CORS ĐỂ FRONTEND GỌI ĐƯỢC API (DÙNG ĐỂ DEV LOCAL)
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
 
-                configuration.setAllowedOrigins(Arrays.asList(
-                                "http://localhost:3000", 
-                                "https://jobconnect-fe-nextjs.vercel.app" 
-                ));
-                configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+                configuration.setAllowedOriginPatterns(Arrays.asList(
+                                "http://localhost:3000",
+                                "https://jobconnect-fe-nextjs.vercel.app",
+                                "https://*.vercel.app"));
+
+                configuration.setAllowedMethods(Arrays.asList(
+                                "GET",
+                                "POST",
+                                "PUT",
+                                "PATCH",
+                                "DELETE",
+                                "OPTIONS"));
+
                 configuration.setAllowedHeaders(Arrays.asList("*"));
                 configuration.setAllowCredentials(true);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", configuration);
+
                 return source;
         }
 }
