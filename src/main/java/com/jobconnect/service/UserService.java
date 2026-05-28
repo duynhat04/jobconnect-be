@@ -197,43 +197,78 @@ public class UserService {
 
     // 1. Lấy thông tin Profile
     public UserProfileDto getUserProfile(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
 
-        return new UserProfileDto(
-                user.getEmail(),
-                user.getFullName(),
-                user.getPhone(),
-                user.getAddress(),
-                user.getBio(),
-                user.getSkills(), // Thêm
-                user.getCvUrl() // Thêm
-        );
-    }
+    return new UserProfileDto(
+            user.getEmail(),
+            user.getFullName(),
+            user.getPhone(),
+            user.getAddress(),
+            user.getBio(),
+            user.getSkills(),
+            user.getCvUrl(),
+
+            user.getDesiredPosition(),
+            user.getDesiredCategory(),
+            user.getExperienceYears(),
+            user.getExpectedSalary(),
+            user.getWorkType(),
+            user.getEducationLevel(),
+            user.getEnglishLevel(),
+            user.getCertificates(),
+            user.getProjects(),
+            user.getAvailableFrom()
+    );
+}
 
     // 2. Cập nhật Profile
     public UserProfileDto updateUserProfile(String email, UserProfileDto profileDto) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
 
-        user.setFullName(profileDto.getFullName());
-        user.setPhone(profileDto.getPhone());
-        user.setAddress(profileDto.getAddress());
-        user.setBio(profileDto.getBio());
-        user.setSkills(profileDto.getSkills());
-        user.setCvUrl(profileDto.getCvUrl());
+    user.setFullName(profileDto.getFullName());
+    user.setPhone(profileDto.getPhone());
+    user.setAddress(profileDto.getAddress());
+    user.setBio(profileDto.getBio());
+    user.setSkills(profileDto.getSkills());
+    user.setCvUrl(profileDto.getCvUrl());
 
-        userRepository.save(user);
+    // Cập nhật thông tin nghề nghiệp ứng viên
+    user.setDesiredPosition(profileDto.getDesiredPosition());
+    user.setDesiredCategory(profileDto.getDesiredCategory());
+    user.setExperienceYears(profileDto.getExperienceYears());
+    user.setExpectedSalary(profileDto.getExpectedSalary());
+    user.setWorkType(profileDto.getWorkType());
+    user.setEducationLevel(profileDto.getEducationLevel());
+    user.setEnglishLevel(profileDto.getEnglishLevel());
+    user.setCertificates(profileDto.getCertificates());
+    user.setProjects(profileDto.getProjects());
+    user.setAvailableFrom(profileDto.getAvailableFrom());
 
-        return new UserProfileDto(
-                user.getEmail(),
-                user.getFullName(),
-                user.getPhone(),
-                user.getAddress(),
-                user.getBio(),
-                user.getSkills(),
-                user.getCvUrl());
-    }
+    userRepository.save(user);
+
+    return new UserProfileDto(
+            user.getEmail(),
+            user.getFullName(),
+            user.getPhone(),
+            user.getAddress(),
+            user.getBio(),
+            user.getSkills(),
+            user.getCvUrl(),
+
+            user.getDesiredPosition(),
+            user.getDesiredCategory(),
+            user.getExperienceYears(),
+            user.getExpectedSalary(),
+            user.getWorkType(),
+            user.getEducationLevel(),
+            user.getEnglishLevel(),
+            user.getCertificates(),
+            user.getProjects(),
+            user.getAvailableFrom()
+    );
+}
 
     public JwtResponse loginWithGoogle(String credential) {
         try {

@@ -73,4 +73,34 @@ public class User {
 
     @Column(name = "cv_url")
     private String cvUrl;
+
+    @Column(name = "desired_position")
+    private String desiredPosition;
+
+    @Column(name = "desired_category")
+    private String desiredCategory;
+
+    @Column(name = "experience_years")
+    private Integer experienceYears;
+
+    @Column(name = "expected_salary")
+    private Long expectedSalary;
+
+    @Column(name = "work_type")
+    private String workType;
+
+    @Column(name = "education_level")
+    private String educationLevel;
+
+    @Column(name = "english_level")
+    private String englishLevel;
+
+    @Column(columnDefinition = "TEXT")
+    private String certificates;
+
+    @Column(columnDefinition = "TEXT")
+    private String projects;
+
+    @Column(name = "available_from")
+    private String availableFrom;
 }
