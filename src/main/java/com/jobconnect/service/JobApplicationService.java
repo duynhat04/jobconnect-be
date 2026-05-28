@@ -591,7 +591,7 @@ public class JobApplicationService {
                 "và", "hoặc", "là", "của", "cho", "với", "các", "một", "những",
                 "the", "and", "or", "to", "of", "in", "on", "for", "a", "an",
                 "kinh", "nghiệm", "yêu", "cầu", "mô", "tả", "công", "việc",
-                "ứng", "viên", "làm", "việc"
+                "ứng", "viên", "làm"
         );
 
         return stopWords.contains(word);
