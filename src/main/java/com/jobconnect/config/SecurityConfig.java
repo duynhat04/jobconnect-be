@@ -60,14 +60,34 @@ public class SecurityConfig {
                                                                 "/api/users/login",
                                                                 "/api/users/google-login",
                                                                 "/api/users/verify-otp",
-                                                                "/api/users/resend-otp")
+                                                                "/api/users/resend-otp",
+                                                                "/api/users/forgot-password",
+                                                                "/api/users/reset-password")
                                                 .permitAll()
 
                                                 // ==========================================
                                                 // 2. ADMIN: Quyền quản trị hệ thống
                                                 // ==========================================
-                                                .requestMatchers(
-                                                                "/api/admin/**",
+                                                .requestMatchers("/api/admin/**")
+                                                .hasAuthority("ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/v1/packages/active")
+                                                .permitAll()
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/v1/packages/**")
+                                                .hasAnyAuthority("ADMIN", "EMPLOYER")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/v1/packages/**")
+                                                .hasAuthority("ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.PUT,
+                                                                "/api/v1/packages/**")
+                                                .hasAuthority("ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.DELETE,
                                                                 "/api/v1/packages/**")
                                                 .hasAuthority("ADMIN")
 
@@ -84,6 +104,7 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/jobs/my-jobs",
                                                                 "/api/companies/my-company",
+                                                                "/api/companies/my-stats",
                                                                 "/api/applications/job/*",
                                                                 "/api/applications/job/*/candidates",
                                                                 "/api/applications/employer/all")
@@ -127,6 +148,7 @@ public class SecurityConfig {
                                                                 "/api/users/profile",
                                                                 "/api/users/change-password",
                                                                 "/api/users/refresh-token",
+                                                                "/api/users/avatar",
                                                                 "/api/notifications/**")
                                                 .authenticated()
 
@@ -141,9 +163,12 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/jobs",
                                                                 "/api/jobs/*",
+                                                                "/api/jobs/**",
                                                                 "/api/companies",
                                                                 "/api/companies/*",
-                                                                "/api/v1/packages/active",
+                                                                "/api/companies/**",
+                                                                "/api/news",
+                                                                "/api/news/**",
                                                                 "/api/dev/**")
                                                 .permitAll()
 

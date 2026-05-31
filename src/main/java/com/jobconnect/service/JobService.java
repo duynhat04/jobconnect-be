@@ -28,40 +28,38 @@ public class JobService {
     private UserRepository userRepository;
 
     private String normalizeCategory(String category) {
-    if (category == null || category.trim().isEmpty()) {
-        return null;
-    }
-    category = category.trim().replaceAll("\\s+", " ");
-
-    List<String> upperCaseWords = List.of(
-            "IT", "AI", "HR", "UI", "UX",
-            "QA", "SEO", "DEVOPS", "PM", "BA"
-    );
-
-    String[] words = category.split(" ");
-    StringBuilder result = new StringBuilder();
-
-    for (String word : words) {
-        if (word.isBlank()) {
-            continue;
+        if (category == null || category.trim().isEmpty()) {
+            return null;
         }
-        String upperWord = word.toUpperCase();
-        // Nếu là từ viết tắt => giữ nguyên in hoa
-        if (upperCaseWords.contains(upperWord)) {
-            result.append(upperWord);
-        } else {
-            // capitalize bình thường
-            result.append(
-                    Character.toUpperCase(word.charAt(0))
-                            + word.substring(1).toLowerCase()
-            );
-        }
-        result.append(" ");
-    }
-    return result.toString().trim();
-}
+        category = category.trim().replaceAll("\\s+", " ");
 
-    @Transactional // THÊM MỚI: Nếu lưu Job lỗi, DB sẽ Rollback (không trừ lượt của khách)
+        List<String> upperCaseWords = List.of(
+                "IT", "AI", "HR", "UI", "UX",
+                "QA", "SEO", "DEVOPS", "PM", "BA");
+
+        String[] words = category.split(" ");
+        StringBuilder result = new StringBuilder();
+
+        for (String word : words) {
+            if (word.isBlank()) {
+                continue;
+            }
+            String upperWord = word.toUpperCase();
+            // Nếu là từ viết tắt => giữ nguyên in hoa
+            if (upperCaseWords.contains(upperWord)) {
+                result.append(upperWord);
+            } else {
+                // capitalize bình thường
+                result.append(
+                        Character.toUpperCase(word.charAt(0))
+                                + word.substring(1).toLowerCase());
+            }
+            result.append(" ");
+        }
+        return result.toString().trim();
+    }
+
+    @Transactional
     public Job createJob(JobRequest jobRequest, String employerEmail) {
 
         Company company = companyRepository.findByUser_Email(employerEmail)
@@ -81,7 +79,7 @@ public class JobService {
 
         // --- THỰC HIỆN TRỪ TIN ---
         company.setRemainingPosts(remaining - 1);
-        companyRepository.save(company); 
+        companyRepository.save(company);
 
         Job job = new Job();
         job.setTitle(jobRequest.getTitle());
@@ -200,16 +198,40 @@ public class JobService {
 
     public List<Job> getRelatedJobs(Long jobId) {
 
-    Job currentJob = jobRepository.findById(jobId)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc"));
+        Job currentJob = jobRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc"));
 
-    Pageable pageable = PageRequest.of(0, 4);
+        Pageable pageable = PageRequest.of(0, 4);
 
-    return jobRepository.findRelatedJobs(
-            currentJob.getId(),
-            currentJob.getCategory(),
-            currentJob.getCompany().getId(),
-            pageable
-    );
-}
+        return jobRepository.findRelatedJobs(
+                currentJob.getId(),
+                currentJob.getCategory(),
+                currentJob.getCompany().getId(),
+                pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Job> getPublicJobsByCompany(Long companyId, int page, int size) {
+        if (page < 0) {
+            page = 0;
+        }
+
+        if (size <= 0) {
+            size = 6;
+        }
+
+        if (size > 30) {
+            size = 30;
+        }
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return jobRepository.findByCompany_IdAndStatusOrderByCreatedAtDesc(
+                companyId,
+                "APPROVED",
+                pageable);
+    }
 }

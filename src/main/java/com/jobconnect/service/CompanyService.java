@@ -1,6 +1,7 @@
 package com.jobconnect.service;
 
 import com.jobconnect.dto.CompanyStatsDTO;
+import com.jobconnect.dto.CompanyListResponse;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.User;
 import com.jobconnect.repository.CompanyRepository;
@@ -9,7 +10,10 @@ import com.jobconnect.repository.JobRepository;
 import com.jobconnect.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CompanyService {
@@ -130,5 +134,61 @@ public class CompanyService {
             existingCompany.setWebsite(updatedData.getWebsite());
 
         return companyRepository.save(existingCompany);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CompanyListResponse> getPublicCompanies(String keyword, int page, int size) {
+        if (page < 0) {
+            page = 0;
+        }
+
+        if (size <= 0) {
+            size = 9;
+        }
+
+        if (size > 30) {
+            size = 30;
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        String cleanKeyword = keyword == null ? null : keyword.trim();
+
+        Page<Company> companies;
+
+        if (cleanKeyword == null || cleanKeyword.isEmpty()) {
+            companies = companyRepository.findByStatusOrderByIdDesc("APPROVED", pageable);
+        } else {
+            companies = companyRepository.findByNameContainingIgnoreCaseAndStatusOrderByIdDesc(
+                    cleanKeyword,
+                    "APPROVED",
+                    pageable);
+        }
+
+        return companies.map(this::toCompanyListResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public CompanyListResponse getPublicCompanyDetail(Long id) {
+        Company company = companyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy công ty!"));
+
+        if (!"APPROVED".equalsIgnoreCase(company.getStatus())) {
+            throw new RuntimeException("Công ty chưa được duyệt hoặc không khả dụng!");
+        }
+
+        return toCompanyListResponse(company);
+    }
+
+    private CompanyListResponse toCompanyListResponse(Company company) {
+        return new CompanyListResponse(
+                company.getId(),
+                company.getName(),
+                company.getLogo(),
+                company.getAddress(),
+                company.getWebsite(),
+                company.getDescription(),
+                company.getStatus(),
+                company.getRemainingPosts());
     }
 }

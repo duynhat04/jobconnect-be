@@ -32,6 +32,8 @@ public class User {
     private String fullName;
 
     private String phone;
+    
+    @Column(name = "avatar_url", length = 1000)
     private String avatarUrl;
 
     @Column(nullable = false)
@@ -103,4 +105,10 @@ public class User {
 
     @Column(name = "available_from")
     private String availableFrom;
+
+    @Column(name = "reset_password_otp", length = 10)
+    private String resetPasswordOtp;
+
+    @Column(name = "reset_password_otp_expired_at")
+    private LocalDateTime resetPasswordOtpExpiredAt;
 }

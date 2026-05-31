@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.data.domain.Page;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -166,6 +166,20 @@ public class JobController {
             return ResponseEntity.ok(jobService.getRelatedJobs(id));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/company/{companyId}")
+    public ResponseEntity<?> getJobsByCompany(
+            @PathVariable Long companyId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "6") int size) {
+        try {
+            return ResponseEntity.ok(
+                    jobService.getPublicJobsByCompany(companyId, page, size));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "Lỗi tải việc làm của công ty: " + e.getMessage()));
         }
     }
 }

@@ -16,6 +16,7 @@ public class UserProfileDto {
     private String bio;
     private String skills;
     private String cvUrl;
+    private String avatarUrl;
 
     private String desiredPosition;
     private String desiredCategory;
