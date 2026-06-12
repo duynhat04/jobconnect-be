@@ -140,7 +140,18 @@ public class SecurityConfig {
 
                                                 .requestMatchers("/api/cv/**")
                                                 .hasAuthority("CANDIDATE")
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/users/saved-jobs",
+                                                                "/api/users/saved-jobs/**")
+                                                .hasAnyAuthority("CANDIDATE", "ADMIN")
 
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/users/saved-jobs/**")
+                                                .hasAnyAuthority("CANDIDATE", "ADMIN")
+
+                                                .requestMatchers(org.springframework.http.HttpMethod.DELETE,
+                                                                "/api/users/saved-jobs/**")
+                                                .hasAnyAuthority("CANDIDATE", "ADMIN")
                                                 // ==========================================
                                                 // 5. USER ĐÃ ĐĂNG NHẬP: Profile, đổi mật khẩu, thông báo, AI
                                                 // ==========================================
@@ -169,7 +180,9 @@ public class SecurityConfig {
                                                                 "/api/companies/**",
                                                                 "/api/news",
                                                                 "/api/news/**",
+                                                                "/api/public/**",
                                                                 "/api/dev/**")
+
                                                 .permitAll()
 
                                                 // ==========================================

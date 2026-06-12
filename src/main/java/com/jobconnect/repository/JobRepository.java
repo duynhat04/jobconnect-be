@@ -1,86 +1,269 @@
 package com.jobconnect.repository;
 
+import com.jobconnect.entity.EmploymentType;
 import com.jobconnect.entity.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
 
-    // Tìm kiếm theo tên (Title) chứa từ khóa, không phân biệt hoa thường
+    // =========================
+    // BASIC QUERY
+    // =========================
+
     List<Job> findByTitleContainingIgnoreCase(String title);
 
-    // Lọc theo địa điểm
     List<Job> findByLocation(String location);
 
-    // 1. Lọc job theo trạng thái (VD: Lấy danh sách job "APPROVED" cho trang chủ)
     List<Job> findByStatus(String status);
 
-    // 2. Lấy toàn bộ job của một công ty cụ thể (Để công ty tự quản lý tin của
-    // mình)
+    Page<Job> findByStatus(String status, Pageable pageable);
+
+    Page<Job> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
     List<Job> findByCompanyId(Long companyId);
 
-    // Để đếm tổng số job của 1 công ty
     long countByCompanyId(Long companyId);
 
-    // Hàm tìm kiếm và lọc kết hợp
-    @Query("SELECT j FROM Job j WHERE j.status = 'APPROVED' " +
-            "AND (:keyword IS NULL OR :keyword = '' OR LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
-            +
-            "AND (:location IS NULL OR :location = '' OR LOWER(j.location) LIKE LOWER(CONCAT('%', :location, '%'))) "
-            +
-            "AND (:category IS NULL OR :category = '' OR LOWER(j.category) = LOWER(:category)) " +
-            "AND (:minSalary IS NULL OR j.salary >= :minSalary)")
+    long countByCompanyIdAndStatus(Long companyId, String status);
+
+    List<Job> findByCompany_User_Email(String email);
+
+    // =========================
+    // FETCH COMPANY
+    // Tránh lỗi lazy loading khi map DTO cần company
+    // =========================
+
+    @Query("""
+            SELECT j FROM Job j
+            JOIN FETCH j.company c
+            WHERE j.id = :id
+            """)
+    Optional<Job> findByIdWithCompany(@Param("id") Long id);
+
+    @Query("""
+            SELECT j FROM Job j
+            JOIN FETCH j.company c
+            JOIN c.user u
+            WHERE u.email = :email
+            ORDER BY j.createdAt DESC
+            """)
+    List<Job> findMyJobsWithCompany(@Param("email") String email);
+
+    @Query("""
+            SELECT j FROM Job j
+            JOIN FETCH j.company c
+            WHERE j.status = :status
+            AND j.expiredAt >= :today
+            ORDER BY j.createdAt DESC
+            """)
+    List<Job> findApprovedJobsWithCompany(
+            @Param("status") String status,
+            @Param("today") LocalDate today
+    );
+
+    @Query("""
+            SELECT j FROM Job j
+            JOIN FETCH j.company c
+            WHERE j.id = :jobId
+            """)
+    Optional<Job> findRelatedSourceJobWithCompany(@Param("jobId") Long jobId);
+
+    // =========================
+    // PUBLIC SEARCH / FILTER
+    // EntityGraph fetch company để map JobResponse, không dùng JOIN FETCH với Page
+    // =========================
+
+    @EntityGraph(attributePaths = {"company"})
+    @Query("""
+            SELECT j FROM Job j
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+
+            AND (
+                :keyword IS NULL OR :keyword = ''
+                OR LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(j.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(j.requirements) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            )
+
+            AND (
+                :location IS NULL OR :location = ''
+                OR LOWER(j.location) LIKE LOWER(CONCAT('%', :location, '%'))
+            )
+
+            AND (
+                :category IS NULL OR :category = ''
+                OR LOWER(j.category) = LOWER(:category)
+            )
+
+            AND (
+                :minSalary IS NULL OR j.salary >= :minSalary
+            )
+
+            AND (
+                :employmentType IS NULL OR j.employmentType = :employmentType
+            )
+            """)
     Page<Job> searchAndFilterJobs(
             @Param("keyword") String keyword,
             @Param("location") String location,
             @Param("category") String category,
             @Param("minSalary") Long minSalary,
-            Pageable pageable);
+            @Param("employmentType") EmploymentType employmentType,
+            Pageable pageable
+    );
 
-    // Lọc Job theo trạng thái (Có phân trang cho trang quản lý của Admin)
-    Page<Job> findByStatus(String status, Pageable pageable);
-
-    // Tìm Job theo tiêu đề (Có phân trang cho trang quản lý của Admin)
-    Page<Job> findByTitleContainingIgnoreCase(String title, Pageable pageable);
-
-    // Lấy tất cả các Job thuộc về Company mà Company đó lại do User (email) sở hữu
-    List<Job> findByCompany_User_Email(String email);
-
-    // --- THÊM VÀO ĐỂ ĐẾM SỐ LƯỢNG JOB ĐANG ACTIVE ---
-    @Query("SELECT COUNT(j) FROM Job j WHERE j.company.id = :companyId AND j.status = 'APPROVED'")
-    long countActiveJobsByCompanyId(@Param("companyId") Long companyId);
-
-    @Query("SELECT DISTINCT j.category FROM Job j " +
-            "WHERE j.category IS NOT NULL AND j.category <> '' " +
-            "ORDER BY j.category ASC")
-    List<String> findDistinctCategories();
-
-    long countByCompanyIdAndStatus(Long companyId, String status);
+    // =========================
+    // COUNT / CATEGORY
+    // =========================
 
     @Query("""
-                SELECT j FROM Job j
-                WHERE j.status = 'APPROVED'
-                AND j.id <> :jobId
-                AND (
-                    LOWER(j.category) = LOWER(:category)
-                    OR j.company.id = :companyId
-                )
-                ORDER BY j.createdAt DESC
+            SELECT COUNT(j) FROM Job j
+            WHERE j.company.id = :companyId
+            AND j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            """)
+    long countActiveJobsByCompanyId(@Param("companyId") Long companyId);
+
+    @Query("""
+            SELECT DISTINCT j.category FROM Job j
+            WHERE j.category IS NOT NULL
+            AND TRIM(j.category) <> ''
+            AND j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            ORDER BY j.category ASC
+            """)
+    List<String> findDistinctCategories();
+
+    @Query("""
+            SELECT COUNT(j) FROM Job j
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            """)
+    long countActivePublicJobs();
+
+    @Query("""
+            SELECT COUNT(DISTINCT j.location) FROM Job j
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            AND j.location IS NOT NULL
+            AND TRIM(j.location) <> ''
+            """)
+    long countDistinctActiveLocations();
+
+    // =========================
+    // PUBLIC MONTHLY STATS
+    // Dùng cho /api/public/monthly-stats
+    // =========================
+
+    @Query("""
+            SELECT COUNT(j) FROM Job j
+            WHERE j.status = 'APPROVED'
+            AND j.createdAt >= :startOfMonth
+            AND j.createdAt < :startOfNextMonth
+            """)
+    long countApprovedJobsThisMonth(
+            @Param("startOfMonth") LocalDateTime startOfMonth,
+            @Param("startOfNextMonth") LocalDateTime startOfNextMonth
+    );
+
+    // =========================
+    // RELATED JOBS
+    // =========================
+
+    @Query("""
+            SELECT j FROM Job j
+            JOIN FETCH j.company c
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            AND j.id <> :jobId
+            AND (
+                (:category IS NOT NULL AND LOWER(j.category) = LOWER(:category))
+                OR c.id = :companyId
+            )
+            ORDER BY j.createdAt DESC
             """)
     List<Job> findRelatedJobs(
             @Param("jobId") Long jobId,
             @Param("category") String category,
             @Param("companyId") Long companyId,
-            Pageable pageable);
+            Pageable pageable
+    );
 
-    Page<Job> findByCompany_IdAndStatusOrderByCreatedAtDesc(
+    // =========================
+    // PUBLIC JOBS BY COMPANY
+    // =========================
+
+    @EntityGraph(attributePaths = {"company"})
+    Page<Job> findByCompany_IdAndStatusAndExpiredAtGreaterThanEqualOrderByCreatedAtDesc(
             Long companyId,
             String status,
-            Pageable pageable);
+            LocalDate today,
+            Pageable pageable
+    );
+
+    // =========================
+    // EMPLOYER JOB MANAGEMENT
+    // =========================
+
+    @EntityGraph(attributePaths = {"company"})
+    Page<Job> findByCompany_IdOrderByCreatedAtDesc(
+            Long companyId,
+            Pageable pageable
+    );
+
+    // =========================
+    // ADMIN JOB MANAGEMENT WITH COMPANY
+    // Dùng riêng cho admin để không trả Job entity bị lazy company
+    // =========================
+
+    @EntityGraph(attributePaths = {"company"})
+    @Query("""
+            SELECT j FROM Job j
+            """)
+    Page<Job> findAllWithCompany(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"company"})
+    @Query("""
+            SELECT j FROM Job j
+            WHERE j.status = :status
+            """)
+    Page<Job> findByStatusWithCompany(
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"company"})
+    @Query("""
+            SELECT j FROM Job j
+            WHERE LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))
+            """)
+    Page<Job> findByTitleContainingIgnoreCaseWithCompany(
+            @Param("title") String title,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"company"})
+    @Query("""
+            SELECT j FROM Job j
+            WHERE LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))
+            AND j.status = :status
+            """)
+    Page<Job> findByTitleContainingIgnoreCaseAndStatusWithCompany(
+            @Param("title") String title,
+            @Param("status") String status,
+            Pageable pageable
+    );
 }

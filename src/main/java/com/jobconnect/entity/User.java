@@ -32,7 +32,7 @@ public class User {
     private String fullName;
 
     private String phone;
-    
+
     @Column(name = "avatar_url", length = 1000)
     private String avatarUrl;
 
@@ -111,4 +111,10 @@ public class User {
 
     @Column(name = "reset_password_otp_expired_at")
     private LocalDateTime resetPasswordOtpExpiredAt;
+
+    @Column(name = "portfolio_url", length = 1000)
+    private String portfolioUrl;
+
+    @Column(name = "linkedin_url", length = 1000)
+    private String linkedinUrl;
 }

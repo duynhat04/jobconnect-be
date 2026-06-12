@@ -17,44 +17,84 @@ public class CloudinaryStorageService {
     private final Cloudinary cloudinary;
 
     private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+    private static final long MAX_COMPANY_LOGO_SIZE = 2 * 1024 * 1024;
+    private static final long MAX_COMPANY_COVER_SIZE = 4 * 1024 * 1024;
     private static final long MAX_CV_SIZE = 5 * 1024 * 1024;
 
-    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of(
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
             "image/jpeg",
             "image/png",
-            "image/webp");
+            "image/webp"
+    );
 
     private static final Set<String> ALLOWED_CV_TYPES = Set.of(
             "application/pdf",
             "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
 
     public String uploadAvatar(MultipartFile file, Long userId) {
         validateFile(
                 file,
                 MAX_AVATAR_SIZE,
-                ALLOWED_AVATAR_TYPES,
+                ALLOWED_IMAGE_TYPES,
                 "Ảnh đại diện chỉ hỗ trợ JPG, PNG hoặc WEBP!",
-                "Ảnh đại diện không được vượt quá 2MB!");
+                "Ảnh đại diện không được vượt quá 2MB!"
+        );
 
         return upload(
                 file,
                 "jobconnect/avatars",
-                "avatar_user_" + userId + "_" + UUID.randomUUID());
+                "avatar_user_" + userId + "_" + UUID.randomUUID()
+        );
+    }
+
+    public String uploadCompanyLogo(MultipartFile file, Long companyId) {
+        validateFile(
+                file,
+                MAX_COMPANY_LOGO_SIZE,
+                ALLOWED_IMAGE_TYPES,
+                "Logo công ty chỉ hỗ trợ JPG, PNG hoặc WEBP!",
+                "Logo công ty không được vượt quá 2MB!"
+        );
+
+        return upload(
+                file,
+                "jobconnect/companies/logos",
+                "company_logo_" + companyId + "_" + UUID.randomUUID()
+        );
+    }
+
+    public String uploadCompanyCover(MultipartFile file, Long companyId) {
+        validateFile(
+                file,
+                MAX_COMPANY_COVER_SIZE,
+                ALLOWED_IMAGE_TYPES,
+                "Ảnh bìa công ty chỉ hỗ trợ JPG, PNG hoặc WEBP!",
+                "Ảnh bìa công ty không được vượt quá 4MB!"
+        );
+
+        return upload(
+                file,
+                "jobconnect/companies/covers",
+                "company_cover_" + companyId + "_" + UUID.randomUUID()
+        );
     }
 
     public String uploadNewsThumbnail(MultipartFile file, Long adminId) {
         validateFile(
                 file,
                 MAX_AVATAR_SIZE,
-                ALLOWED_AVATAR_TYPES,
+                ALLOWED_IMAGE_TYPES,
                 "Ảnh bài viết chỉ hỗ trợ JPG, PNG hoặc WEBP!",
-                "Ảnh bài viết không được vượt quá 2MB!");
+                "Ảnh bài viết không được vượt quá 2MB!"
+        );
 
         return upload(
                 file,
                 "jobconnect/news",
-                "news_thumbnail_" + adminId + "_" + UUID.randomUUID());
+                "news_thumbnail_" + adminId + "_" + UUID.randomUUID()
+        );
     }
 
     public String uploadCv(MultipartFile file, Long userId) {
@@ -63,12 +103,14 @@ public class CloudinaryStorageService {
                 MAX_CV_SIZE,
                 ALLOWED_CV_TYPES,
                 "CV chỉ hỗ trợ PDF, DOC hoặc DOCX!",
-                "Kích thước file CV quá lớn. Vui lòng upload file dưới 5MB!");
+                "Kích thước file CV quá lớn. Vui lòng upload file dưới 5MB!"
+        );
 
         return upload(
                 file,
                 "jobconnect/cvs",
-                "cv_user_" + userId + "_" + UUID.randomUUID());
+                "cv_user_" + userId + "_" + UUID.randomUUID()
+        );
     }
 
     private String upload(MultipartFile file, String folder, String publicId) {
@@ -79,7 +121,9 @@ public class CloudinaryStorageService {
                             "folder", folder,
                             "public_id", publicId,
                             "resource_type", "auto",
-                            "overwrite", true));
+                            "overwrite", true
+                    )
+            );
 
             Object secureUrl = result.get("secure_url");
 
@@ -98,7 +142,8 @@ public class CloudinaryStorageService {
             long maxSize,
             Set<String> allowedTypes,
             String invalidTypeMessage,
-            String maxSizeMessage) {
+            String maxSizeMessage
+    ) {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("Vui lòng chọn file để upload!");
         }

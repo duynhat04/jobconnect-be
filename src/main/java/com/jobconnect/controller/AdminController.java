@@ -3,6 +3,7 @@ package com.jobconnect.controller;
 import com.jobconnect.dto.CompanyAdminDTO;
 import com.jobconnect.dto.DashboardStatsDTO;
 import com.jobconnect.dto.RevenueStatsDTO;
+import com.jobconnect.dto.JobAdminDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.User;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -40,17 +42,21 @@ public class AdminController {
 
     // DUYỆT / TỪ CHỐI CÔNG TY
     @PutMapping("/companies/{id}/status")
-    public ResponseEntity<Company> updateCompanyStatus(
+    public ResponseEntity<?> updateCompanyStatus(
             @PathVariable Long id,
             @RequestParam String status) {
 
-        Company updatedCompany = adminService.updateCompanyStatus(id, status);
-        return ResponseEntity.ok(updatedCompany);
+        CompanyAdminDTO updatedCompany = adminService.updateCompanyStatus(id, status);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message", "Cập nhật trạng thái công ty thành công!",
+                        "company", updatedCompany));
     }
 
     // Lấy danh sách
     @GetMapping("/jobs")
-    public ResponseEntity<Page<Job>> getAllJobs(
+    public ResponseEntity<Page<JobAdminDTO>> getAllJobs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String status,
@@ -87,8 +93,8 @@ public class AdminController {
 
     // LẤY CHI TIẾT 1 JOB
     @GetMapping("/jobs/{id}")
-    public ResponseEntity<Job> getJobById(@PathVariable Long id) {
-        Job job = adminService.getJobById(id);
+    public ResponseEntity<JobAdminDTO> getJobById(@PathVariable Long id) {
+        JobAdminDTO job = adminService.getJobById(id);
         return ResponseEntity.ok(job);
     }
 

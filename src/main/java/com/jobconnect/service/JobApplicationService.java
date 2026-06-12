@@ -1,7 +1,7 @@
 package com.jobconnect.service;
 
-import com.cloudinary.Cloudinary;
 import com.jobconnect.dto.ApplicationCandidateDto;
+import com.jobconnect.dto.ApplicationResponse;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.JobApplication;
 import com.jobconnect.entity.User;
@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -57,22 +56,37 @@ public class JobApplicationService {
         }
     }
 
-    // LUỒNG 1: Ứng viên nộp CV bằng file mới upload
+    // Ứng viên nộp CV file mới
     @Transactional
-    public JobApplication applyWithNewCV(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter)
-            throws Exception {
+    public ApplicationResponse applyWithNewCV(
+            String userEmail,
+            Long jobId,
+            MultipartFile cvFile,
+            String coverLetter) throws Exception {
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        Job job = jobRepository.findById(jobId)
+        Job job = jobRepository.findByIdWithCompany(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
 
         if (job.getCompany() == null || job.getCompany().getUser() == null) {
             throw new RuntimeException("Tin tuyển dụng chưa liên kết với doanh nghiệp hợp lệ!");
         }
 
+        if (!"APPROVED".equalsIgnoreCase(job.getStatus())) {
+            throw new RuntimeException("Tin tuyển dụng chưa được duyệt hoặc không khả dụng!");
+        }
+
+        if (job.getExpiredAt() != null && job.getExpiredAt().isBefore(java.time.LocalDate.now())) {
+            throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
+        }
+
         checkDuplicateApplication(user, job);
+
+        if (cvFile == null || cvFile.isEmpty()) {
+            throw new RuntimeException("Vui lòng tải lên CV!");
+        }
 
         String cvUrl = cloudinaryStorageService.uploadCv(cvFile, user.getId());
 
@@ -80,39 +94,42 @@ public class JobApplicationService {
         application.setUser(user);
         application.setJob(job);
         application.setCvUrl(cvUrl);
-        application.setCoverLetter(coverLetter);
+        application.setCoverLetter(normalize(coverLetter));
         application.setStatus("PENDING");
+
+        fillCandidateSnapshot(application, user);
 
         JobApplication savedApplication = applicationRepository.save(application);
 
-        Long employerUserId = job.getCompany().getUser().getId();
-        String candidateName = user.getFullName();
-        String jobTitle = job.getTitle();
+        sendNewApplicationNotificationAsync(savedApplication, job, user, false);
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                notificationService.createNotification(
-                        employerUserId,
-                        "Có ứng tuyển mới!",
-                        "Ứng viên " + candidateName + " vừa nộp CV vào vị trí " + jobTitle,
-                        "NEW_APPLICATION",
-                        "/employer/manage-applications");
-            } catch (Exception e) {
-                System.err.println("⚠️ Lỗi bắn thông báo ngầm: " + e.getMessage());
-            }
-        });
-
-        return savedApplication;
+        return toApplicationResponse(savedApplication);
     }
 
-    // LUỒNG 2: Ứng viên nộp bằng CV đã lưu trong hệ thống
+    // Ứng viên nộp bằng CV đã lưu
     @Transactional
-    public JobApplication applyWithExistingCV(String userEmail, Long jobId, Long userCvId, String coverLetter) {
+    public ApplicationResponse applyWithExistingCV(
+            String userEmail,
+            Long jobId,
+            Long userCvId,
+            String coverLetter) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        Job job = jobRepository.findById(jobId)
+        Job job = jobRepository.findByIdWithCompany(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc này!"));
+
+        if (job.getCompany() == null || job.getCompany().getUser() == null) {
+            throw new RuntimeException("Tin tuyển dụng chưa liên kết với doanh nghiệp hợp lệ!");
+        }
+
+        if (!"APPROVED".equalsIgnoreCase(job.getStatus())) {
+            throw new RuntimeException("Tin tuyển dụng chưa được duyệt hoặc không khả dụng!");
+        }
+
+        if (job.getExpiredAt() != null && job.getExpiredAt().isBefore(java.time.LocalDate.now())) {
+            throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
+        }
 
         checkDuplicateApplication(user, job);
 
@@ -120,61 +137,51 @@ public class JobApplicationService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy CV đã lưu!"));
 
         if (!userCV.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Lỗi bảo mật: Bạn không có quyền sử dụng CV này!");
+            throw new RuntimeException("Bạn không có quyền sử dụng CV này!");
         }
 
         JobApplication application = new JobApplication();
         application.setUser(user);
         application.setJob(job);
         application.setCvUrl(userCV.getFileUrl());
-        application.setCoverLetter(coverLetter);
+        application.setCoverLetter(normalize(coverLetter));
         application.setStatus("PENDING");
+
+        fillCandidateSnapshot(application, user);
 
         JobApplication savedApplication = applicationRepository.save(application);
 
-        Long employerUserId = job.getCompany().getUser().getId();
-        String candidateName = user.getFullName();
-        String jobTitle = job.getTitle();
+        sendNewApplicationNotificationAsync(savedApplication, job, user, true);
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                notificationService.createNotification(
-                        employerUserId,
-                        "Có ứng tuyển mới!",
-                        "Ứng viên " + candidateName + " vừa sử dụng CV đã lưu để nộp vào vị trí " + jobTitle,
-                        "NEW_APPLICATION",
-                        "/employer/manage-applications");
-            } catch (Exception e) {
-                System.err.println("⚠️ Lỗi bắn thông báo ngầm: " + e.getMessage());
-            }
-        });
-
-        return savedApplication;
+        return toApplicationResponse(savedApplication);
     }
 
-    // LUỒNG 3: API upload CV
     @Transactional
-    public JobApplication applyJob(String userEmail, Long jobId, MultipartFile cvFile, String coverLetter)
-            throws Exception {
+    public ApplicationResponse applyJob(
+            String userEmail,
+            Long jobId,
+            MultipartFile cvFile,
+            String coverLetter) throws Exception {
         return applyWithNewCV(userEmail, jobId, cvFile, coverLetter);
     }
 
-    // Ứng viên xem danh sách công việc đã ứng tuyển
     @Transactional(readOnly = true)
-    public List<JobApplication> getMyApplications(String email) {
+    public List<ApplicationResponse> getMyApplications(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        return applicationRepository.findByUserId(user.getId());
+        return applicationRepository.findByUserIdOrderByAppliedAtDesc(user.getId())
+                .stream()
+                .map(this::toApplicationResponse)
+                .collect(Collectors.toList());
     }
 
-    // API cũ: NTD xem danh sách hồ sơ của 1 job
     @Transactional(readOnly = true)
-    public List<JobApplication> getApplicationsForJob(Long jobId, String employerEmail) {
+    public List<ApplicationResponse> getApplicationsForJob(Long jobId, String employerEmail) {
         User employer = userRepository.findByEmail(employerEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        Job job = jobRepository.findById(jobId)
+        Job job = jobRepository.findByIdWithCompany(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc!"));
 
         if (job.getCompany() == null || job.getCompany().getUser() == null) {
@@ -182,19 +189,24 @@ public class JobApplicationService {
         }
 
         if (!job.getCompany().getUser().getId().equals(employer.getId())) {
-            throw new RuntimeException("LỖI BẢO MẬT: Bạn không có quyền xem CV của công ty khác!");
+            throw new RuntimeException("Bạn không có quyền xem CV của công ty khác!");
         }
 
-        return applicationRepository.findByJobId(jobId);
+        return applicationRepository.findByJobIdOrderByAppliedAtDesc(jobId)
+                .stream()
+                .map(this::toApplicationResponse)
+                .collect(Collectors.toList());
     }
 
-    // NTD cập nhật trạng thái hồ sơ ứng tuyển
     @Transactional
-    public JobApplication updateApplicationStatus(Long applicationId, String newStatus, String employerEmail) {
+    public ApplicationResponse updateApplicationStatus(
+            Long applicationId,
+            String newStatus,
+            String employerEmail) {
         User employer = userRepository.findByEmail(employerEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
-        JobApplication application = applicationRepository.findById(applicationId)
+        JobApplication application = applicationRepository.findWithRelationsById(applicationId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ ứng tuyển!"));
 
         if (application.getJob() == null ||
@@ -204,7 +216,7 @@ public class JobApplicationService {
         }
 
         if (!application.getJob().getCompany().getUser().getId().equals(employer.getId())) {
-            throw new RuntimeException("LỖI BẢO MẬT: Bạn không có quyền duyệt CV của công ty khác!");
+            throw new RuntimeException("Bạn không có quyền duyệt CV của công ty khác!");
         }
 
         String status = normalize(newStatus);
@@ -220,65 +232,22 @@ public class JobApplicationService {
         }
 
         application.setStatus(status);
+
         JobApplication savedApp = applicationRepository.save(application);
 
-        Long candidateUserId = savedApp.getUser().getId();
-        String candidateEmail = savedApp.getUser().getEmail();
-        String jobTitle = savedApp.getJob().getTitle();
-        String companyName = savedApp.getJob().getCompany().getName();
-        String finalStatus = status;
+        sendApplicationStatusNotificationAsync(savedApp, status);
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                String statusVN = "ACCEPTED".equalsIgnoreCase(finalStatus) ? "được CHẤP NHẬN" : "bị TỪ CHỐI";
-
-                if ("ACCEPTED".equalsIgnoreCase(finalStatus) || "REJECTED".equalsIgnoreCase(finalStatus)) {
-                    notificationService.createNotification(
-                            candidateUserId,
-                            "Cập nhật trạng thái ứng tuyển",
-                            "Hồ sơ của bạn tại vị trí " + jobTitle + " đã " + statusVN,
-                            "APPLICATION_STATUS",
-                            "/candidate/my-applications");
-                }
-            } catch (Exception e) {
-                System.err.println("⚠️ Lỗi bắn thông báo ngầm: " + e.getMessage());
-            }
-
-            try {
-                if ("ACCEPTED".equalsIgnoreCase(finalStatus)) {
-                    String subject = "🎉 Chúc mừng! Hồ sơ của bạn đã được duyệt";
-                    String body = "Chào bạn,\n\nCông ty " + companyName + " đã xem xét hồ sơ của bạn cho vị trí "
-                            + jobTitle + ".\n"
-                            + "Chúng tôi rất ấn tượng và muốn mời bạn tham gia vòng phỏng vấn tiếp theo.\n\n"
-                            + "Bộ phận nhân sự sẽ sớm liên hệ với bạn để chốt lịch hẹn.\n\n"
-                            + "Trân trọng,\n" + companyName;
-
-                    emailService.sendEmail(candidateEmail, subject, body);
-                } else if ("REJECTED".equalsIgnoreCase(finalStatus)) {
-                    String subject = "Thông báo kết quả ứng tuyển vị trí " + jobTitle;
-                    String body = "Chào bạn,\n\nCảm ơn bạn đã quan tâm và ứng tuyển vào vị trí " + jobTitle + " tại "
-                            + companyName + ".\n"
-                            + "Rất tiếc, hồ sơ của bạn chưa phù hợp với tiêu chí của chúng tôi ở thời điểm hiện tại.\n\n"
-                            + "Chúc bạn may mắn và thành công trên con đường sự nghiệp!\n\n"
-                            + "Trân trọng,\n" + companyName;
-
-                    emailService.sendEmail(candidateEmail, subject, body);
-                }
-            } catch (Exception e) {
-                System.err.println("⚠️ Lỗi gửi email ngầm: " + e.getMessage());
-            }
-        });
-
-        return savedApp;
+        return toApplicationResponse(savedApp);
     }
 
-    // API NTD xem tất cả hồ sơ ứng tuyển của công ty
     @Transactional(readOnly = true)
-    public List<JobApplication> getAllApplicationsForMyCompany(String employerEmail) {
-        return applicationRepository.findByJob_Company_User_EmailOrderByIdDesc(employerEmail);
+    public List<ApplicationResponse> getAllApplicationsForMyCompany(String employerEmail) {
+        return applicationRepository.findByJob_Company_User_EmailOrderByAppliedAtDesc(employerEmail)
+                .stream()
+                .map(this::toApplicationResponse)
+                .collect(Collectors.toList());
     }
 
-    // API NTD xem ứng viên theo từng job, tự chấm điểm phù hợp với yêu cầu job
     @Transactional(readOnly = true)
     public Page<ApplicationCandidateDto> searchCandidatesForJob(
             Long jobId,
@@ -302,7 +271,7 @@ public class JobApplicationService {
         User employer = userRepository.findByEmail(employerEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhà tuyển dụng!"));
 
-        Job job = jobRepository.findById(jobId)
+        Job job = jobRepository.findByIdWithCompany(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy công việc!"));
 
         if (job.getCompany() == null || job.getCompany().getUser() == null) {
@@ -310,7 +279,7 @@ public class JobApplicationService {
         }
 
         if (!job.getCompany().getUser().getId().equals(employer.getId())) {
-            throw new RuntimeException("LỖI BẢO MẬT: Bạn không có quyền xem ứng viên của tin tuyển dụng này!");
+            throw new RuntimeException("Bạn không có quyền xem ứng viên của tin tuyển dụng này!");
         }
 
         String normalizedKeyword = normalize(keyword);
@@ -344,6 +313,118 @@ public class JobApplicationService {
                 result.size());
     }
 
+    private void fillCandidateSnapshot(JobApplication application, User user) {
+        application.setCandidateName(user.getFullName());
+        application.setCandidateEmail(user.getEmail());
+        application.setCandidatePhone(user.getPhone());
+        application.setCandidateAddress(user.getAddress());
+        application.setCandidateSkills(user.getSkills());
+        application.setCandidateDesiredPosition(user.getDesiredPosition());
+        application.setCandidateDesiredCategory(user.getDesiredCategory());
+        application.setCandidateExperienceYears(user.getExperienceYears());
+        application.setCandidateExpectedSalary(user.getExpectedSalary());
+        application.setCandidateWorkType(user.getWorkType());
+        application.setCandidateEducationLevel(user.getEducationLevel());
+        application.setCandidateEnglishLevel(user.getEnglishLevel());
+        application.setCandidateCertificates(user.getCertificates());
+        application.setCandidateProjects(user.getProjects());
+        application.setCandidateAvailableFrom(user.getAvailableFrom());
+        application.setCandidatePortfolioUrl(user.getPortfolioUrl());
+        application.setCandidateLinkedinUrl(user.getLinkedinUrl());
+    }
+
+    private ApplicationResponse toApplicationResponse(JobApplication app) {
+        User user = app.getUser();
+        Job job = app.getJob();
+
+        Long companyId = null;
+        String companyName = null;
+        String companyLogo = null;
+        String companyAddress = null;
+
+        if (job != null && job.getCompany() != null) {
+            companyId = job.getCompany().getId();
+            companyName = job.getCompany().getName();
+            companyLogo = job.getCompany().getLogo();
+            companyAddress = job.getCompany().getAddress();
+        }
+
+        return ApplicationResponse.builder()
+                .id(app.getId())
+
+                // =========================
+                // JOB INFO
+                // =========================
+                .jobId(job != null ? job.getId() : null)
+                .jobTitle(job != null ? job.getTitle() : null)
+                .jobCategory(job != null ? job.getCategory() : null)
+                .jobLocation(job != null ? job.getLocation() : null)
+                .jobSalary(job != null ? job.getSalary() : null)
+                .employmentType(
+                        job != null && job.getEmploymentType() != null
+                                ? job.getEmploymentType().name()
+                                : null)
+                .jobExpiredAt(job != null ? job.getExpiredAt() : null)
+                .jobStatus(job != null ? job.getStatus() : null)
+
+                // =========================
+                // COMPANY INFO
+                // =========================
+                .companyId(companyId)
+                .companyName(companyName)
+                .companyLogo(companyLogo)
+                .companyAddress(companyAddress)
+
+                // =========================
+                // CANDIDATE SNAPSHOT
+                // =========================
+                .candidateId(user != null ? user.getId() : null)
+                .candidateName(firstNotBlank(app.getCandidateName(), user != null ? user.getFullName() : null))
+                .candidateEmail(firstNotBlank(app.getCandidateEmail(), user != null ? user.getEmail() : null))
+                .candidatePhone(firstNotBlank(app.getCandidatePhone(), user != null ? user.getPhone() : null))
+                .candidateAddress(firstNotBlank(app.getCandidateAddress(), user != null ? user.getAddress() : null))
+
+                .candidateSkills(firstNotBlank(app.getCandidateSkills(), user != null ? user.getSkills() : null))
+                .candidateDesiredPosition(
+                        firstNotBlank(app.getCandidateDesiredPosition(),
+                                user != null ? user.getDesiredPosition() : null))
+                .candidateDesiredCategory(
+                        firstNotBlank(app.getCandidateDesiredCategory(),
+                                user != null ? user.getDesiredCategory() : null))
+                .candidateExperienceYears(
+                        app.getCandidateExperienceYears() != null
+                                ? app.getCandidateExperienceYears()
+                                : user != null ? user.getExperienceYears() : null)
+                .candidateExpectedSalary(
+                        app.getCandidateExpectedSalary() != null
+                                ? app.getCandidateExpectedSalary()
+                                : user != null ? user.getExpectedSalary() : null)
+                .candidateWorkType(firstNotBlank(app.getCandidateWorkType(), user != null ? user.getWorkType() : null))
+                .candidateEducationLevel(
+                        firstNotBlank(app.getCandidateEducationLevel(), user != null ? user.getEducationLevel() : null))
+                .candidateEnglishLevel(
+                        firstNotBlank(app.getCandidateEnglishLevel(), user != null ? user.getEnglishLevel() : null))
+                .candidateCertificates(
+                        firstNotBlank(app.getCandidateCertificates(), user != null ? user.getCertificates() : null))
+                .candidateProjects(
+                        firstNotBlank(app.getCandidateProjects(), user != null ? user.getProjects() : null))
+                .candidateAvailableFrom(
+                        firstNotBlank(app.getCandidateAvailableFrom(), user != null ? user.getAvailableFrom() : null))
+                .candidatePortfolioUrl(
+                        firstNotBlank(app.getCandidatePortfolioUrl(), user != null ? user.getPortfolioUrl() : null))
+                .candidateLinkedinUrl(
+                        firstNotBlank(app.getCandidateLinkedinUrl(), user != null ? user.getLinkedinUrl() : null))
+
+                // =========================
+                // APPLICATION INFO
+                // =========================
+                .cvUrl(app.getCvUrl())
+                .coverLetter(app.getCoverLetter())
+                .status(app.getStatus())
+                .appliedAt(app.getAppliedAt())
+                .build();
+    }
+
     private ApplicationCandidateDto toApplicationCandidateDto(JobApplication app) {
         User user = app.getUser();
         Job job = app.getJob();
@@ -356,26 +437,27 @@ public class JobApplicationService {
                 job.getTitle(),
 
                 user.getId(),
-                user.getFullName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAddress(),
+                firstNotBlank(app.getCandidateName(), user.getFullName()),
+                firstNotBlank(app.getCandidateEmail(), user.getEmail()),
+                firstNotBlank(app.getCandidatePhone(), user.getPhone()),
+                firstNotBlank(app.getCandidateAddress(), user.getAddress()),
 
                 user.getBio(),
-                user.getSkills(),
+                firstNotBlank(app.getCandidateSkills(), user.getSkills()),
                 app.getCvUrl(),
                 app.getCoverLetter(),
 
-                user.getDesiredPosition(),
-                user.getDesiredCategory(),
-                user.getExperienceYears(),
-                user.getExpectedSalary(),
-                user.getWorkType(),
-                user.getEducationLevel(),
-                user.getEnglishLevel(),
-                user.getCertificates(),
-                user.getProjects(),
-                user.getAvailableFrom(),
+                firstNotBlank(app.getCandidateDesiredPosition(), user.getDesiredPosition()),
+                firstNotBlank(app.getCandidateDesiredCategory(), user.getDesiredCategory()),
+                app.getCandidateExperienceYears() != null ? app.getCandidateExperienceYears()
+                        : user.getExperienceYears(),
+                app.getCandidateExpectedSalary() != null ? app.getCandidateExpectedSalary() : user.getExpectedSalary(),
+                firstNotBlank(app.getCandidateWorkType(), user.getWorkType()),
+                firstNotBlank(app.getCandidateEducationLevel(), user.getEducationLevel()),
+                firstNotBlank(app.getCandidateEnglishLevel(), user.getEnglishLevel()),
+                firstNotBlank(app.getCandidateCertificates(), user.getCertificates()),
+                firstNotBlank(app.getCandidateProjects(), user.getProjects()),
+                firstNotBlank(app.getCandidateAvailableFrom(), user.getAvailableFrom()),
 
                 app.getStatus(),
                 app.getAppliedAt(),
@@ -392,35 +474,30 @@ public class JobApplicationService {
         String jobDescription = safe(job.getDescription());
         String jobLocation = safe(job.getLocation());
 
-        String userSkills = safe(user.getSkills());
-        String desiredPosition = safe(user.getDesiredPosition());
-        String desiredCategory = safe(user.getDesiredCategory());
-        String userAddress = safe(user.getAddress());
+        String userSkills = safe(firstNotBlank(app.getCandidateSkills(), user.getSkills()));
+        String desiredPosition = safe(firstNotBlank(app.getCandidateDesiredPosition(), user.getDesiredPosition()));
+        String desiredCategory = safe(firstNotBlank(app.getCandidateDesiredCategory(), user.getDesiredCategory()));
+        String userAddress = safe(firstNotBlank(app.getCandidateAddress(), user.getAddress()));
         String bio = safe(user.getBio());
-        String projects = safe(user.getProjects());
-        String certificates = safe(user.getCertificates());
+        String projects = safe(firstNotBlank(app.getCandidateProjects(), user.getProjects()));
+        String certificates = safe(firstNotBlank(app.getCandidateCertificates(), user.getCertificates()));
         String coverLetter = safe(app.getCoverLetter());
 
-        // 1. Có CV trong hồ sơ ứng tuyển
         if (notBlank(app.getCvUrl())) {
             score += 10;
         }
 
-        // 2. Vị trí mong muốn khớp tên job
         if (textRelated(jobTitle, desiredPosition)) {
             score += 20;
         }
 
-        // 3. Ngành nghề mong muốn khớp category job
         if (textRelated(jobCategory, desiredCategory)) {
             score += 15;
         }
 
-        // 4. Kỹ năng khớp yêu cầu công việc
         int skillScore = calculateKeywordOverlapScore(userSkills, jobRequirements);
         score += Math.min(skillScore, 35);
 
-        // 5. Thông tin hồ sơ khớp mô tả/yêu cầu công việc
         int profileScore = 0;
         profileScore += calculateKeywordOverlapScore(bio, jobRequirements);
         profileScore += calculateKeywordOverlapScore(projects, jobRequirements);
@@ -429,50 +506,128 @@ public class JobApplicationService {
         profileScore += calculateKeywordOverlapScore(coverLetter, jobRequirements);
         score += Math.min(profileScore, 20);
 
-        // 6. Kinh nghiệm
-        if (user.getExperienceYears() != null) {
-            if (user.getExperienceYears() >= 3) {
+        Integer experienceYears = app.getCandidateExperienceYears() != null
+                ? app.getCandidateExperienceYears()
+                : user.getExperienceYears();
+
+        if (experienceYears != null) {
+            if (experienceYears >= 3) {
                 score += 15;
-            } else if (user.getExperienceYears() >= 1) {
+            } else if (experienceYears >= 1) {
                 score += 10;
-            } else if (user.getExperienceYears() == 0) {
+            } else if (experienceYears == 0) {
                 score += 3;
             }
         }
 
-        // 7. Địa điểm
         if (textRelated(jobLocation, userAddress)) {
             score += 10;
         }
 
-        // 8. Lương mong muốn
-        // Nếu ứng viên không nhập lương thì không loại hồ sơ.
+        Long expectedSalary = app.getCandidateExpectedSalary() != null
+                ? app.getCandidateExpectedSalary()
+                : user.getExpectedSalary();
+
         if (job.getSalary() != null) {
-            if (user.getExpectedSalary() == null) {
+            if (expectedSalary == null) {
                 score += 5;
-            } else if (user.getExpectedSalary() <= job.getSalary()) {
+            } else if (expectedSalary <= job.getSalary()) {
                 score += 10;
             }
         }
 
-        // 9. Hồ sơ đầy đủ hơn được cộng điểm nhẹ
-        if (notBlank(user.getEducationLevel())) {
+        if (notBlank(firstNotBlank(app.getCandidateEducationLevel(), user.getEducationLevel()))) {
             score += 3;
         }
 
-        if (notBlank(user.getEnglishLevel())) {
+        if (notBlank(firstNotBlank(app.getCandidateEnglishLevel(), user.getEnglishLevel()))) {
             score += 3;
         }
 
-        if (notBlank(user.getProjects())) {
+        if (notBlank(firstNotBlank(app.getCandidateProjects(), user.getProjects()))) {
             score += 5;
         }
 
-        if (notBlank(user.getCertificates())) {
+        if (notBlank(firstNotBlank(app.getCandidateCertificates(), user.getCertificates()))) {
             score += 4;
         }
 
         return Math.min(score, 100);
+    }
+
+    private void sendNewApplicationNotificationAsync(
+            JobApplication application,
+            Job job,
+            User user,
+            boolean existingCv) {
+        Long employerUserId = job.getCompany().getUser().getId();
+        String candidateName = firstNotBlank(application.getCandidateName(), user.getFullName());
+        String jobTitle = job.getTitle();
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String message = existingCv
+                        ? "Ứng viên " + candidateName + " vừa sử dụng CV đã lưu để nộp vào vị trí " + jobTitle
+                        : "Ứng viên " + candidateName + " vừa nộp CV vào vị trí " + jobTitle;
+
+                notificationService.createNotification(
+                        employerUserId,
+                        "Có ứng tuyển mới!",
+                        message,
+                        "NEW_APPLICATION",
+                        "/employer/manage-applications");
+            } catch (Exception e) {
+                System.err.println("Lỗi bắn thông báo ngầm: " + e.getMessage());
+            }
+        });
+    }
+
+    private void sendApplicationStatusNotificationAsync(JobApplication savedApp, String finalStatus) {
+        Long candidateUserId = savedApp.getUser().getId();
+        String candidateEmail = firstNotBlank(savedApp.getCandidateEmail(), savedApp.getUser().getEmail());
+        String jobTitle = savedApp.getJob().getTitle();
+        String companyName = savedApp.getJob().getCompany().getName();
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String statusVN = "ACCEPTED".equalsIgnoreCase(finalStatus) ? "được CHẤP NHẬN" : "bị TỪ CHỐI";
+
+                if ("ACCEPTED".equalsIgnoreCase(finalStatus) || "REJECTED".equalsIgnoreCase(finalStatus)) {
+                    notificationService.createNotification(
+                            candidateUserId,
+                            "Cập nhật trạng thái ứng tuyển",
+                            "Hồ sơ của bạn tại vị trí " + jobTitle + " đã " + statusVN,
+                            "APPLICATION_STATUS",
+                            "/candidate/my-applications");
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi bắn thông báo ngầm: " + e.getMessage());
+            }
+
+            try {
+                if ("ACCEPTED".equalsIgnoreCase(finalStatus)) {
+                    String subject = "🎉 Chúc mừng! Hồ sơ của bạn đã được duyệt";
+                    String body = "Chào bạn,\n\nCông ty " + companyName + " đã xem xét hồ sơ của bạn cho vị trí "
+                            + jobTitle + ".\n"
+                            + "Chúng tôi rất ấn tượng và muốn mời bạn tham gia vòng phỏng vấn tiếp theo.\n\n"
+                            + "Bộ phận nhân sự sẽ sớm liên hệ với bạn để chốt lịch hẹn.\n\n"
+                            + "Trân trọng,\n" + companyName;
+
+                    emailService.sendEmail(candidateEmail, subject, body);
+                } else if ("REJECTED".equalsIgnoreCase(finalStatus)) {
+                    String subject = "Thông báo kết quả ứng tuyển vị trí " + jobTitle;
+                    String body = "Chào bạn,\n\nCảm ơn bạn đã quan tâm và ứng tuyển vào vị trí " + jobTitle + " tại "
+                            + companyName + ".\n"
+                            + "Rất tiếc, hồ sơ của bạn chưa phù hợp với tiêu chí của chúng tôi ở thời điểm hiện tại.\n\n"
+                            + "Chúc bạn may mắn và thành công trên con đường sự nghiệp!\n\n"
+                            + "Trân trọng,\n" + companyName;
+
+                    emailService.sendEmail(candidateEmail, subject, body);
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi gửi email ngầm: " + e.getMessage());
+            }
+        });
     }
 
     private String normalize(String value) {
@@ -490,6 +645,10 @@ public class JobApplicationService {
 
     private boolean notBlank(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String firstNotBlank(String first, String second) {
+        return notBlank(first) ? first : second;
     }
 
     private boolean textRelated(String a, String b) {

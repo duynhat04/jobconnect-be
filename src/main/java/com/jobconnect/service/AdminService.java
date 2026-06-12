@@ -3,6 +3,7 @@ package com.jobconnect.service;
 import com.jobconnect.dto.DashboardStatsDTO;
 import com.jobconnect.dto.RevenueStatsDTO;
 import com.jobconnect.dto.CompanyAdminDTO;
+import com.jobconnect.dto.JobAdminDTO;
 import com.jobconnect.entity.Company;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.User;
@@ -20,10 +21,10 @@ public interface AdminService {
     Page<CompanyAdminDTO> getAllCompanies(int page, int size, String status, String search);
 
     // Thay đổi trạng thái công ty (Duyệt / Từ chối)
-    Company updateCompanyStatus(Long companyId, String status);
+    CompanyAdminDTO updateCompanyStatus(Long companyId, String status);
 
     // Lấy danh sách Job (Có phân trang)
-    Page<Job> getAllJobs(int page, int size, String status, String search);
+    Page<JobAdminDTO> getAllJobs(int page, int size, String status, String search);
 
     // Cập nhật trạng thái Job (Duyệt / Từ chối / Khóa)
     Job updateJobStatus(Long jobId, String status);
@@ -37,7 +38,7 @@ public interface AdminService {
     // Khóa / Mở khóa tài khoản ứng viên (Ban/Unban)
     User updateUserStatus(Long userId, boolean isActive);
 
-    Job getJobById(Long id);
+    JobAdminDTO getJobById(Long id);
 
     // Lấy chi tiết 1 công ty
     Company getCompanyById(Long id);

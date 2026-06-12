@@ -30,4 +30,12 @@ public class CompanyAdminDTO {
     private String createdAt;
 
     private Integer remainingPosts;
+
+    private String coverImage;
+
+    private String companySize;
+
+    private String industry;
+
+    private String specialization;
 }
