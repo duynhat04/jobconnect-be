@@ -9,7 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -70,8 +71,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             """)
     List<Job> findApprovedJobsWithCompany(
             @Param("status") String status,
-            @Param("today") LocalDate today
-    );
+            @Param("today") LocalDate today);
 
     @Query("""
             SELECT j FROM Job j
@@ -85,7 +85,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     // EntityGraph fetch company để map JobResponse, không dùng JOIN FETCH với Page
     // =========================
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     @Query("""
             SELECT j FROM Job j
             WHERE j.status = 'APPROVED'
@@ -122,8 +122,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("category") String category,
             @Param("minSalary") Long minSalary,
             @Param("employmentType") EmploymentType employmentType,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     // =========================
     // COUNT / CATEGORY
@@ -176,8 +175,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             """)
     long countApprovedJobsThisMonth(
             @Param("startOfMonth") LocalDateTime startOfMonth,
-            @Param("startOfNextMonth") LocalDateTime startOfNextMonth
-    );
+            @Param("startOfNextMonth") LocalDateTime startOfNextMonth);
 
     // =========================
     // RELATED JOBS
@@ -199,63 +197,58 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             @Param("jobId") Long jobId,
             @Param("category") String category,
             @Param("companyId") Long companyId,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     // =========================
     // PUBLIC JOBS BY COMPANY
     // =========================
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     Page<Job> findByCompany_IdAndStatusAndExpiredAtGreaterThanEqualOrderByCreatedAtDesc(
             Long companyId,
             String status,
             LocalDate today,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     // =========================
     // EMPLOYER JOB MANAGEMENT
     // =========================
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     Page<Job> findByCompany_IdOrderByCreatedAtDesc(
             Long companyId,
-            Pageable pageable
-    );
+            Pageable pageable);
 
     // =========================
     // ADMIN JOB MANAGEMENT WITH COMPANY
     // Dùng riêng cho admin để không trả Job entity bị lazy company
     // =========================
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     @Query("""
             SELECT j FROM Job j
             """)
     Page<Job> findAllWithCompany(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     @Query("""
             SELECT j FROM Job j
             WHERE j.status = :status
             """)
     Page<Job> findByStatusWithCompany(
             @Param("status") String status,
-            Pageable pageable
-    );
+            Pageable pageable);
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     @Query("""
             SELECT j FROM Job j
             WHERE LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))
             """)
     Page<Job> findByTitleContainingIgnoreCaseWithCompany(
             @Param("title") String title,
-            Pageable pageable
-    );
+            Pageable pageable);
 
-    @EntityGraph(attributePaths = {"company"})
+    @EntityGraph(attributePaths = { "company" })
     @Query("""
             SELECT j FROM Job j
             WHERE LOWER(j.title) LIKE LOWER(CONCAT('%', :title, '%'))
@@ -264,6 +257,88 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     Page<Job> findByTitleContainingIgnoreCaseAndStatusWithCompany(
             @Param("title") String title,
             @Param("status") String status,
-            Pageable pageable
-    );
+            Pageable pageable);
+
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Job j
+            SET j.status = 'EXPIRED'
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt < CURRENT_DATE
+            """)
+    int markExpiredApprovedJobs();
+
+    @Query("""
+            SELECT j FROM Job j
+            WHERE j.status = 'EXPIRED'
+            ORDER BY j.expiredAt DESC
+            """)
+    List<Job> findExpiredJobs();
+
+    long countByStatus(String status);
+
+    @EntityGraph(attributePaths = { "company" })
+    @Query("""
+            SELECT j FROM Job j
+            WHERE j.status = 'APPROVED'
+            AND j.expiredAt >= CURRENT_DATE
+            ORDER BY j.createdAt DESC
+            """)
+    Page<Job> findAiSearchablePublicJobs(Pageable pageable);
+
+    @Query(value = """
+            WITH query_data AS (
+                SELECT websearch_to_tsquery(
+                    'simple',
+                    public.immutable_unaccent(CAST(:keyword AS text))
+                ) AS query
+            )
+            SELECT j.*
+            FROM jobs j
+            CROSS JOIN query_data q
+            WHERE j.status = 'APPROVED'
+            AND j.expired_at >= CURRENT_DATE
+            AND (
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.title, ''))), 'A') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.requirements, ''))), 'B') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.description, ''))), 'C') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.category, ''))), 'C') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.location, ''))), 'D')
+            ) @@ q.query
+            ORDER BY
+                ts_rank_cd(
+                    (
+                        setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.title, ''))), 'A') ||
+                        setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.requirements, ''))), 'B') ||
+                        setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.description, ''))), 'C') ||
+                        setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.category, ''))), 'C') ||
+                        setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.location, ''))), 'D')
+                    ),
+                    q.query
+                ) DESC,
+                j.created_at DESC
+            """, countQuery = """
+            WITH query_data AS (
+                SELECT websearch_to_tsquery(
+                    'simple',
+                    public.immutable_unaccent(CAST(:keyword AS text))
+                ) AS query
+            )
+            SELECT COUNT(*)
+            FROM jobs j
+            CROSS JOIN query_data q
+            WHERE j.status = 'APPROVED'
+            AND j.expired_at >= CURRENT_DATE
+            AND (
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.title, ''))), 'A') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.requirements, ''))), 'B') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.description, ''))), 'C') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.category, ''))), 'C') ||
+                setweight(to_tsvector('simple', public.immutable_unaccent(coalesce(j.location, ''))), 'D')
+            ) @@ q.query
+            """, nativeQuery = true)
+    Page<Job> searchAiPublicJobsFullText(
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }

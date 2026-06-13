@@ -224,15 +224,26 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional
     public Job updateJobStatus(Long jobId, String status) {
-        // Tìm Job trong DB
-        Job job = jobRepository.findById(jobId)
+        String newStatus = status != null ? status.trim().toUpperCase() : "";
+
+        if (!List.of("PENDING", "APPROVED", "REJECTED", "EXPIRED", "CLOSED").contains(newStatus)) {
+            throw new RuntimeException("Trạng thái tin tuyển dụng không hợp lệ!");
+        }
+
+        Job job = jobRepository.findByIdWithCompany(jobId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy Job với ID: " + jobId));
 
-        // Cập nhật trạng thái mới
-        job.setStatus(status);
+        if ("APPROVED".equals(newStatus)
+                && job.getExpiredAt() != null
+                && job.getExpiredAt().isBefore(java.time.LocalDate.now())) {
+            job.setStatus("EXPIRED");
+            return jobRepository.save(job);
+        }
 
-        // Lưu lại
+        job.setStatus(newStatus);
+
         return jobRepository.save(job);
     }
 

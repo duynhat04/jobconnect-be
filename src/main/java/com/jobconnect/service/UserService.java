@@ -1,5 +1,9 @@
 package com.jobconnect.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.jobconnect.config.JwtUtils;
 import com.jobconnect.dto.JwtResponse;
 import com.jobconnect.dto.RegisterRequest;
@@ -10,38 +14,28 @@ import com.jobconnect.dto.password.ResetPasswordRequest;
 import com.jobconnect.entity.AuthProvider;
 import com.jobconnect.entity.User;
 import com.jobconnect.repository.UserRepository;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Random;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private static final SecureRandom OTP_RANDOM = new SecureRandom();
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private CloudinaryStorageService cloudinaryStorageService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
+    private final EmailService emailService;
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -49,7 +43,28 @@ public class UserService {
     // =========================
     // REGISTER
     // =========================
+
+    @Transactional
     public User registerUser(RegisterRequest request) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu đăng ký không hợp lệ!");
+        }
+
+        String fullName = normalize(request.getFullName());
+        String email = normalizeEmail(request.getEmail());
+
+        if (fullName.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập họ tên!");
+        }
+
+        if (email.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập email!");
+        }
+
+        if (!isValidEmail(email)) {
+            throw new RuntimeException("Email không hợp lệ!");
+        }
+
         if (request.getPassword() == null || request.getConfirmPassword() == null) {
             throw new RuntimeException("Vui lòng nhập đầy đủ mật khẩu!");
         }
@@ -60,52 +75,31 @@ public class UserService {
 
         validateStrongPassword(request.getPassword());
 
-        if (request.getEmail() == null || request.getEmail().isBlank()) {
-            throw new RuntimeException("Vui lòng nhập email!");
-        }
-
-        String email = request.getEmail().trim().toLowerCase();
-
-        if (!email.matches("^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
-            throw new RuntimeException("Email không hợp lệ!");
-        }
-
         if (userRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Email đã tồn tại!");
         }
 
+        String otpCode = generateOtp();
+
         User user = new User();
-        user.setFullName(request.getFullName());
+        user.setFullName(fullName);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole("CANDIDATE");
         user.setProvider(AuthProvider.LOCAL);
-
-        String otpCode = generateOtp();
+        user.setEmailVerified(false);
         user.setOtpCode(otpCode);
         user.setOtpExpiredAt(LocalDateTime.now().plusMinutes(5));
-        user.setEmailVerified(false);
 
         User savedUser = userRepository.save(user);
 
-        try {
-            emailService.sendEmail(
-                    savedUser.getEmail(),
-                    "Mã xác thực JobConnect",
-                    """
-                    Xin chào %s,
-
-                    Mã OTP xác thực tài khoản của bạn là:
-                    %s
-
-                    OTP sẽ hết hạn sau 5 phút.
-
-                    JobConnect Team
-                    """.formatted(savedUser.getFullName(), otpCode)
-            );
-        } catch (Exception e) {
-            System.out.println("Không thể gửi email OTP: " + e.getMessage());
-        }
+        // Không được try/catch nuốt lỗi ở đây.
+        // Nếu Gmail lỗi, API register phải báo lỗi để FE biết.
+        emailService.sendRegisterOtpEmail(
+                savedUser.getEmail(),
+                savedUser.getFullName(),
+                otpCode
+        );
 
         return savedUser;
     }
@@ -113,9 +107,20 @@ public class UserService {
     // =========================
     // LOGIN LOCAL
     // =========================
+
     public JwtResponse loginUser(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Lỗi: Email không tồn tại!"));
+        String safeEmail = normalizeEmail(email);
+
+        if (safeEmail.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập email!");
+        }
+
+        if (password == null || password.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập mật khẩu!");
+        }
+
+        User user = userRepository.findByEmail(safeEmail)
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
 
         if (user.getProvider() == AuthProvider.GOOGLE && user.getPassword() == null) {
             throw new RuntimeException(
@@ -124,60 +129,68 @@ public class UserService {
         }
 
         if (!user.isEmailVerified()) {
-            throw new RuntimeException("Tài khoản chưa xác thực email!");
+            throw new RuntimeException("Tài khoản chưa xác thực email. Vui lòng kiểm tra mã OTP trong Gmail!");
         }
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Lỗi: Sai mật khẩu!");
+        if (user.getPassword() == null || !passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Sai mật khẩu!");
         }
 
-        String token = jwtUtils.generateToken(user.getEmail(), user.getRole());
-        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
-
-        return new JwtResponse(
-                token,
-                refreshToken,
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getRole(),
-                user.getAvatarUrl()
-        );
+        return buildJwtResponse(user);
     }
 
     // =========================
     // OTP
     // =========================
-    public void verifyOtp(String email, String otp) {
-        User user = userRepository.findByEmail(email)
+
+    @Transactional
+    public User verifyOtp(String email, String otp) {
+        String safeEmail = normalizeEmail(email);
+        String safeOtp = normalize(otp);
+
+        if (safeEmail.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập email!");
+        }
+
+        if (safeOtp.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập mã OTP!");
+        }
+
+        User user = userRepository.findByEmail(safeEmail)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
 
         if (user.isEmailVerified()) {
-            throw new RuntimeException("Email đã xác thực!");
+            return user;
         }
 
-        if (user.getOtpCode() == null) {
-            throw new RuntimeException("OTP không tồn tại!");
+        if (user.getOtpCode() == null || user.getOtpExpiredAt() == null) {
+            throw new RuntimeException("OTP không tồn tại. Vui lòng yêu cầu gửi lại OTP!");
         }
 
-        if (!user.getOtpCode().equals(otp)) {
-            throw new RuntimeException("OTP không chính xác!");
-        }
-
-        if (user.getOtpExpiredAt() == null ||
-                user.getOtpExpiredAt().isBefore(LocalDateTime.now())) {
+        if (user.getOtpExpiredAt().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("OTP đã hết hạn!");
+        }
+
+        if (!user.getOtpCode().equals(safeOtp)) {
+            throw new RuntimeException("OTP không chính xác!");
         }
 
         user.setEmailVerified(true);
         user.setOtpCode(null);
         user.setOtpExpiredAt(null);
 
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
+    @Transactional
     public void resendOtp(String email) {
-        User user = userRepository.findByEmail(email)
+        String safeEmail = normalizeEmail(email);
+
+        if (safeEmail.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập email!");
+        }
+
+        User user = userRepository.findByEmail(safeEmail)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
 
         if (user.isEmailVerified()) {
@@ -191,36 +204,33 @@ public class UserService {
 
         userRepository.save(user);
 
-        emailService.sendEmail(
+        emailService.sendResendOtpEmail(
                 user.getEmail(),
-                "OTP mới xác thực JobConnect",
-                """
-                Xin chào %s,
-
-                OTP mới của bạn là:
-                %s
-
-                OTP sẽ hết hạn sau 5 phút.
-
-                JobConnect Team
-                """.formatted(user.getFullName(), newOtp)
+                user.getFullName(),
+                newOtp
         );
     }
 
     // =========================
     // PROFILE
     // =========================
+
+    @Transactional(readOnly = true)
     public UserProfileDto getUserProfile(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+        String safeEmail = normalizeEmail(email);
+
+        User user = userRepository.findByEmail(safeEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + safeEmail));
 
         return mapToProfileDto(user);
     }
 
     @Transactional
     public UserProfileDto updateUserProfile(String email, UserProfileDto profileDto) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + email));
+        String safeEmail = normalizeEmail(email);
+
+        User user = userRepository.findByEmail(safeEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + safeEmail));
 
         user.setFullName(profileDto.getFullName());
         user.setPhone(profileDto.getPhone());
@@ -248,9 +258,12 @@ public class UserService {
     // =========================
     // UPLOAD AVATAR
     // =========================
+
     @Transactional
     public UserProfileDto uploadAvatar(String email, MultipartFile avatarFile) {
-        User user = userRepository.findByEmail(email)
+        String safeEmail = normalizeEmail(email);
+
+        User user = userRepository.findByEmail(safeEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
         String avatarUrl = cloudinaryStorageService.uploadAvatar(avatarFile, user.getId());
@@ -265,6 +278,8 @@ public class UserService {
     // =========================
     // LOGIN GOOGLE
     // =========================
+
+    @Transactional
     public JwtResponse loginWithGoogle(String credential) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
@@ -282,12 +297,12 @@ public class UserService {
 
             GoogleIdToken.Payload payload = idToken.getPayload();
 
-            String email = payload.getEmail();
+            String email = normalizeEmail(payload.getEmail());
             String fullName = (String) payload.get("name");
             String avatarUrl = (String) payload.get("picture");
             Boolean emailVerified = payload.getEmailVerified();
 
-            if (email == null || email.isBlank()) {
+            if (email.isBlank()) {
                 throw new RuntimeException("Không lấy được email từ Google!");
             }
 
@@ -300,7 +315,7 @@ public class UserService {
             if (user == null) {
                 user = new User();
                 user.setEmail(email);
-                user.setFullName(fullName != null ? fullName : email);
+                user.setFullName(normalize(fullName).isBlank() ? email : fullName.trim());
                 user.setAvatarUrl(avatarUrl);
                 user.setRole("CANDIDATE");
                 user.setProvider(AuthProvider.GOOGLE);
@@ -315,25 +330,16 @@ public class UserService {
 
                 user.setEmailVerified(true);
 
-                if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
+                if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())
+                        && avatarUrl != null
+                        && !avatarUrl.isBlank()) {
                     user.setAvatarUrl(avatarUrl);
                 }
 
                 user = userRepository.save(user);
             }
 
-            String token = jwtUtils.generateToken(user.getEmail(), user.getRole());
-            String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
-
-            return new JwtResponse(
-                    token,
-                    refreshToken,
-                    user.getId(),
-                    user.getEmail(),
-                    user.getFullName(),
-                    user.getRole(),
-                    user.getAvatarUrl()
-            );
+            return buildJwtResponse(user);
 
         } catch (Exception e) {
             throw new RuntimeException("Đăng nhập Google thất bại: " + e.getMessage());
@@ -343,8 +349,12 @@ public class UserService {
     // =========================
     // CHANGE PASSWORD
     // =========================
+
+    @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
-        User user = userRepository.findByEmail(email)
+        String safeEmail = normalizeEmail(email);
+
+        User user = userRepository.findByEmail(safeEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
         if (user.getProvider() == AuthProvider.GOOGLE || user.getPassword() == null) {
@@ -381,12 +391,14 @@ public class UserService {
     // =========================
     // FORGOT PASSWORD
     // =========================
+
+    @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new RuntimeException("Vui lòng nhập email!");
         }
 
-        String email = request.getEmail().trim().toLowerCase();
+        String email = normalizeEmail(request.getEmail());
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại trong hệ thống!"));
@@ -404,24 +416,14 @@ public class UserService {
 
         userRepository.save(user);
 
-        String subject = "Mã OTP đặt lại mật khẩu JobConnect";
-        String body = """
-                Xin chào %s,
-
-                Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản JobConnect.
-
-                Mã OTP đặt lại mật khẩu của bạn là:
-                %s
-
-                Mã OTP sẽ hết hạn sau 5 phút.
-                Nếu bạn không yêu cầu thao tác này, vui lòng bỏ qua email này.
-
-                JobConnect Team
-                """.formatted(user.getFullName(), otp);
-
-        emailService.sendEmail(user.getEmail(), subject, body);
+        emailService.sendResetPasswordOtpEmail(
+                user.getEmail(),
+                user.getFullName(),
+                otp
+        );
     }
 
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new RuntimeException("Vui lòng nhập email!");
@@ -441,7 +443,9 @@ public class UserService {
             throw new RuntimeException("Mật khẩu xác nhận không khớp!");
         }
 
-        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+        String email = normalizeEmail(request.getEmail());
+
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại trong hệ thống!"));
 
         if (user.getProvider() == AuthProvider.GOOGLE || user.getPassword() == null) {
@@ -454,16 +458,16 @@ public class UserService {
             throw new RuntimeException("Bạn chưa yêu cầu đặt lại mật khẩu!");
         }
 
-        if (!user.getResetPasswordOtp().equals(request.getOtp().trim())) {
-            throw new RuntimeException("Mã OTP không chính xác!");
-        }
-
         if (user.getResetPasswordOtpExpiredAt().isBefore(LocalDateTime.now())) {
             user.setResetPasswordOtp(null);
             user.setResetPasswordOtpExpiredAt(null);
             userRepository.save(user);
 
             throw new RuntimeException("Mã OTP đã hết hạn, vui lòng yêu cầu mã mới!");
+        }
+
+        if (!user.getResetPasswordOtp().equals(request.getOtp().trim())) {
+            throw new RuntimeException("Mã OTP không chính xác!");
         }
 
         if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
@@ -481,6 +485,22 @@ public class UserService {
     // =========================
     // HELPER
     // =========================
+
+    private JwtResponse buildJwtResponse(User user) {
+        String token = jwtUtils.generateToken(user.getEmail(), user.getRole());
+        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
+
+        return new JwtResponse(
+                token,
+                refreshToken,
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole(),
+                user.getAvatarUrl()
+        );
+    }
+
     private UserProfileDto mapToProfileDto(User user) {
         return new UserProfileDto(
                 user.getEmail(),
@@ -506,11 +526,21 @@ public class UserService {
     }
 
     private String generateOtp() {
-        Random random = new Random();
-
-        int otp = 100000 + random.nextInt(900000);
+        int otp = 100000 + OTP_RANDOM.nextInt(900000);
 
         return String.valueOf(otp);
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private boolean isValidEmail(String email) {
+        return email.matches("^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,}$");
     }
 
     private void validateStrongPassword(String password) {

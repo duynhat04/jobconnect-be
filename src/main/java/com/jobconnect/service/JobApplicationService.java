@@ -74,11 +74,18 @@ public class JobApplicationService {
             throw new RuntimeException("Tin tuyển dụng chưa liên kết với doanh nghiệp hợp lệ!");
         }
 
+        if ("EXPIRED".equalsIgnoreCase(job.getStatus())) {
+            throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
+        }
+
         if (!"APPROVED".equalsIgnoreCase(job.getStatus())) {
             throw new RuntimeException("Tin tuyển dụng chưa được duyệt hoặc không khả dụng!");
         }
 
         if (job.getExpiredAt() != null && job.getExpiredAt().isBefore(java.time.LocalDate.now())) {
+            job.setStatus("EXPIRED");
+            jobRepository.save(job);
+
             throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
         }
 
@@ -123,11 +130,18 @@ public class JobApplicationService {
             throw new RuntimeException("Tin tuyển dụng chưa liên kết với doanh nghiệp hợp lệ!");
         }
 
+        if ("EXPIRED".equalsIgnoreCase(job.getStatus())) {
+            throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
+        }
+
         if (!"APPROVED".equalsIgnoreCase(job.getStatus())) {
             throw new RuntimeException("Tin tuyển dụng chưa được duyệt hoặc không khả dụng!");
         }
 
         if (job.getExpiredAt() != null && job.getExpiredAt().isBefore(java.time.LocalDate.now())) {
+            job.setStatus("EXPIRED");
+            jobRepository.save(job);
+
             throw new RuntimeException("Tin tuyển dụng đã hết hạn ứng tuyển!");
         }
 

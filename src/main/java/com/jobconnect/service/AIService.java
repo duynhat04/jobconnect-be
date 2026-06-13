@@ -3,7 +3,6 @@ package com.jobconnect.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobconnect.exception.AIException;
-import com.jobconnect.exception.AIException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -289,5 +288,10 @@ public class AIService {
     public record Message(
             String role,
             String content) {
+    }
+
+    public String generateAnswerFromPrompt(String prompt) {
+        prompt = limitInput(prompt, 12000);
+        return callGroq(prompt);
     }
 }

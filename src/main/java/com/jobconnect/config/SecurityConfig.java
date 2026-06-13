@@ -163,9 +163,27 @@ public class SecurityConfig {
                                                                 "/api/notifications/**")
                                                 .authenticated()
 
+                                                // ==========================================
+                                                // 5. AI: Phân quyền theo từng chức năng
+                                                // ==========================================
+
+                                                // Chatbot AI có thể dùng cho user đã đăng nhập.
+                                                // Bên trong AiChatService sẽ tự giới hạn dữ liệu theo role.
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                                                "/api/ai/**")
+                                                                "/api/ai/chat")
                                                 .authenticated()
+
+                                                // Nhà tuyển dụng tạo mô tả công việc bằng AI
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/ai/generate-jd")
+                                                .hasAnyAuthority("EMPLOYER", "ADMIN")
+
+                                                // Ứng viên dùng AI để viết cover letter, phân tích CV, gợi ý việc
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                                                "/api/ai/generate-cover-letter",
+                                                                "/api/ai/suggest-jobs",
+                                                                "/api/ai/analyze-cv")
+                                                .hasAnyAuthority("CANDIDATE", "ADMIN")
 
                                                 // ==========================================
                                                 // 6. PUBLIC GET: Khách vãng lai xem được
