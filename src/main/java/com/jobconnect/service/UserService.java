@@ -505,6 +505,7 @@ public class UserService {
         return new UserProfileDto(
                 user.getEmail(),
                 user.getFullName(),
+                user.getRole(),
                 user.getPhone(),
                 user.getAddress(),
                 user.getBio(),

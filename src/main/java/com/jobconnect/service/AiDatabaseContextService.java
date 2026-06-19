@@ -141,6 +141,8 @@ public class AiDatabaseContextService {
                             .append(job != null ? toJobStatusText(job) : "Không rõ")
                             .append(" | Ngày ứng tuyển: ")
                             .append(app.getAppliedAt() != null ? app.getAppliedAt() : "Không rõ")
+                            .append(" | Link chi tiết: ")
+                            .append(formatJobDetailLink(job))
                             .append("\n");
                 });
 
@@ -271,6 +273,8 @@ public class AiDatabaseContextService {
                             .append(formatDate(job.getExpiredAt()))
                             .append(" | Số CV: ")
                             .append(applicationCount)
+                            .append(" | Link chi tiết: ")
+                            .append(formatJobDetailLink(job))
                             .append("\n");
                 });
 
@@ -315,17 +319,23 @@ public class AiDatabaseContextService {
 
         applications.stream()
                 .limit(MAX_ITEMS)
-                .forEach(app -> context.append("- Ứng viên: ")
-                        .append(safe(app.getCandidateName()))
-                        .append(" | Email: ")
-                        .append(maskEmail(app.getCandidateEmail()))
-                        .append(" | Job: ")
-                        .append(app.getJob() != null ? safe(app.getJob().getTitle()) : "Không rõ")
-                        .append(" | Trạng thái hồ sơ: ")
-                        .append(toApplicationStatusText(app.getStatus()))
-                        .append(" | Ngày ứng tuyển: ")
-                        .append(app.getAppliedAt() != null ? app.getAppliedAt() : "Không rõ")
-                        .append("\n"));
+                .forEach(app -> {
+                    Job job = app.getJob();
+
+                    context.append("- Ứng viên: ")
+                            .append(safe(app.getCandidateName()))
+                            .append(" | Email: ")
+                            .append(maskEmail(app.getCandidateEmail()))
+                            .append(" | Job: ")
+                            .append(job != null ? safe(job.getTitle()) : "Không rõ")
+                            .append(" | Trạng thái hồ sơ: ")
+                            .append(toApplicationStatusText(app.getStatus()))
+                            .append(" | Ngày ứng tuyển: ")
+                            .append(app.getAppliedAt() != null ? app.getAppliedAt() : "Không rõ")
+                            .append(" | Link tin tuyển dụng: ")
+                            .append(formatJobDetailLink(job))
+                            .append("\n");
+                });
 
         return context.toString();
     }
@@ -592,7 +602,9 @@ public class AiDatabaseContextService {
     }
 
     private void appendJobLine(StringBuilder context, Job job) {
-        context.append("- ")
+        context.append("- ID: ")
+                .append(job.getId())
+                .append(" | Tên việc làm: ")
                 .append(safe(job.getTitle()))
                 .append(" | Công ty: ")
                 .append(job.getCompany() != null ? safe(job.getCompany().getName()) : "Không rõ")
@@ -604,7 +616,17 @@ public class AiDatabaseContextService {
                 .append(formatSalary(job.getSalary()))
                 .append(" | Hạn: ")
                 .append(formatDate(job.getExpiredAt()))
+                .append(" | Link chi tiết: ")
+                .append(formatJobDetailLink(job))
                 .append("\n");
+    }
+
+    private String formatJobDetailLink(Job job) {
+        if (job == null || job.getId() == null) {
+            return "Không có";
+        }
+
+        return "/jobs/" + job.getId();
     }
 
     private String extractKeyword(String message) {
