@@ -503,6 +503,7 @@ public class UserService {
 
     private UserProfileDto mapToProfileDto(User user) {
         return new UserProfileDto(
+                user.getId(),
                 user.getEmail(),
                 user.getFullName(),
                 user.getRole(),
