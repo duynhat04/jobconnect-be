@@ -2,6 +2,7 @@ package com.jobconnect.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.jobconnect.dto.CloudinaryUploadResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -97,7 +98,19 @@ public class CloudinaryStorageService {
         );
     }
 
+    /**
+     * Hàm cũ: chỉ trả về URL.
+     * Giữ lại để không làm lỗi các chỗ code đang dùng uploadCv().
+     */
     public String uploadCv(MultipartFile file, Long userId) {
+        return uploadCvWithResult(file, userId).getFileUrl();
+    }
+
+    /**
+     * Hàm mới: trả về cả URL và publicId.
+     * Dùng hàm này khi cần lưu vào bảng user_cvs.
+     */
+    public CloudinaryUploadResult uploadCvWithResult(MultipartFile file, Long userId) {
         validateFile(
                 file,
                 MAX_CV_SIZE,
@@ -106,7 +119,7 @@ public class CloudinaryStorageService {
                 "Kích thước file CV quá lớn. Vui lòng upload file dưới 5MB!"
         );
 
-        return upload(
+        return uploadWithResult(
                 file,
                 "jobconnect/cvs",
                 "cv_user_" + userId + "_" + UUID.randomUUID()
@@ -114,6 +127,14 @@ public class CloudinaryStorageService {
     }
 
     private String upload(MultipartFile file, String folder, String publicId) {
+        return uploadWithResult(file, folder, publicId).getFileUrl();
+    }
+
+    private CloudinaryUploadResult uploadWithResult(
+            MultipartFile file,
+            String folder,
+            String publicId
+    ) {
         try {
             Map<?, ?> result = cloudinary.uploader().upload(
                     file.getBytes(),
@@ -126,12 +147,20 @@ public class CloudinaryStorageService {
             );
 
             Object secureUrl = result.get("secure_url");
+            Object cloudinaryPublicId = result.get("public_id");
 
             if (secureUrl == null) {
                 throw new RuntimeException("Không lấy được URL file từ Cloudinary!");
             }
 
-            return secureUrl.toString();
+            if (cloudinaryPublicId == null) {
+                throw new RuntimeException("Không lấy được publicId file từ Cloudinary!");
+            }
+
+            return new CloudinaryUploadResult(
+                    secureUrl.toString(),
+                    cloudinaryPublicId.toString()
+            );
         } catch (Exception e) {
             throw new RuntimeException("Upload file lên Cloudinary thất bại: " + e.getMessage());
         }

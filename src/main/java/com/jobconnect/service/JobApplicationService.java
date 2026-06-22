@@ -2,6 +2,7 @@ package com.jobconnect.service;
 
 import com.jobconnect.dto.ApplicationCandidateDto;
 import com.jobconnect.dto.ApplicationResponse;
+import com.jobconnect.dto.CloudinaryUploadResult;
 import com.jobconnect.entity.Job;
 import com.jobconnect.entity.JobApplication;
 import com.jobconnect.entity.User;
@@ -95,12 +96,21 @@ public class JobApplicationService {
             throw new RuntimeException("Vui lòng tải lên CV!");
         }
 
-        String cvUrl = cloudinaryStorageService.uploadCv(cvFile, user.getId());
+        CloudinaryUploadResult uploadResult = cloudinaryStorageService.uploadCvWithResult(cvFile, user.getId());
+
+        UserCV savedUserCV = new UserCV();
+        savedUserCV.setUser(user);
+        savedUserCV.setCvName(buildCvName(cvFile));
+        savedUserCV.setFileUrl(uploadResult.getFileUrl());
+        savedUserCV.setCloudinaryPublicId(uploadResult.getPublicId());
+        savedUserCV.setDefault(false);
+
+        userCVRepository.save(savedUserCV);
 
         JobApplication application = new JobApplication();
         application.setUser(user);
         application.setJob(job);
-        application.setCvUrl(cvUrl);
+        application.setCvUrl(uploadResult.getFileUrl());
         application.setCoverLetter(normalize(coverLetter));
         application.setStatus("PENDING");
 
@@ -749,5 +759,13 @@ public class JobApplicationService {
                 "ứng", "viên", "làm");
 
         return stopWords.contains(word);
+    }
+
+    private String buildCvName(MultipartFile file) {
+        if (file == null || !notBlank(file.getOriginalFilename())) {
+            return "CV ứng tuyển";
+        }
+
+        return file.getOriginalFilename().trim();
     }
 }
